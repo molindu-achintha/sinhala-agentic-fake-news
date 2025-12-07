@@ -1,0 +1,4 @@
+id,text,claim,label,sources,pub_date,notes
+1,"රජය විසින් ඉන්ධන මිල 100% කින් වැඩි කරන ලදී.","ඉන්ධන මිල 100% කින් වැඩි කරන ලදී.","false","[]","2023-10-01","Fake claim example"
+2,"ශ්‍රී ලංකාව දූපතකි.","ශ්‍රී ලංකාව දූපතකි.","true","[{""url"": ""https://en.wikipedia.org/wiki/Sri_Lanka""}]","2023-01-01","Generic true claim"
+3,"වෛද්‍යවරයා පැවසුවේ මෙම ඖෂධය පිළිකා සුව කරන බවයි.","ඖෂධය පිළිකා සුව කරයි.","misleading","[]","2023-11-15","Misleading medical claim"

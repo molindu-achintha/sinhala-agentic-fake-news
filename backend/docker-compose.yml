@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../data:/app/data
+    environment:
+      - MODEL_PATH=sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      - EMBEDDINGS_PATH=/app/data/embeddings
+      - FAISS_INDEX_PATH=/app/data/embeddings/faiss_index.bin
+    depends_on:
+      - db
+
+  db:
+    image: mongo:latest  # Placeholder if user wants mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: examplepassword
+    ports:
+      - "27017:27017"

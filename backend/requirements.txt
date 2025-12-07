@@ -1,0 +1,17 @@
+fastapi>=0.95.0
+uvicorn>=0.22.0
+pydantic>=1.10.0
+pydantic-settings
+requests>=2.28.0
+numpy
+pandas
+torch
+transformers
+sentence-transformers
+faiss-cpu
+sqlmodel
+pytest
+httpx
+python-multipart
+scikit-learn
+tqdm
