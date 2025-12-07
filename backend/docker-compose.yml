@@ -21,3 +21,10 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: examplepassword
     ports:
       - "27017:27017"
+
+  frontend:
+    build: ../frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api

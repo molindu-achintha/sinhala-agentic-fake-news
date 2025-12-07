@@ -12,6 +12,15 @@ app = FastAPI(
     version=settings.VERSION
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allow all for local dev, restrict in prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(health.router, tags=["Health"])
 app.include_router(predict.router, prefix="/v1", tags=["Prediction"])
 

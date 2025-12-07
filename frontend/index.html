@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinhala Fake News Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>සිංහල ව්‍යාජ පුවත් හඳුනාගැනීම</h1>
+            <p>Agentic AI මගින් බල ගැන්වේ</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <textarea id="newsInput" placeholder="පුවත මෙහි ඇතුළත් කරන්න..."></textarea>
+                <div class="controls">
+                    <button id="checkBtn">පරීක්ෂා කරන්න</button>
+                    <div id="loader" class="hidden">පරීක්ෂා කරමින්...</div>
+                </div>
+            </div>
+
+            <div id="resultSection" class="result-section hidden">
+                <div id="verdictBadge" class="badge"></div>
+                
+                <div class="card">
+                    <h3>ප්‍රකාශය (Claim)</h3>
+                    <p id="claimText"></p>
+                </div>
+
+                <div class="card">
+                    <h3>පැහැදිලි කිරීම</h3>
+                    <p id="explanationText"></p>
+                </div>
+
+                <div class="card">
+                    <h3>හේතු දැක්වීම (Reasoning)</h3>
+                    <ul id="reasoningList"></ul>
+                </div>
+
+                <div class="card">
+                    <h3>මූලාශ්‍ර (Sources)</h3>
+                    <ul id="sourcesList"></ul>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
