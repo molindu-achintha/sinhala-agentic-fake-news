@@ -7,6 +7,8 @@ services:
       - "8080:8080"
     volumes:
       - ../data:/app/data
+    env_file:
+      - ../.env
     environment:
       - MODEL_PATH=sentence-transformers/paraphrase-multilingual-mpnet-base-v2
       - EMBEDDINGS_PATH=/app/data/embeddings
@@ -15,7 +17,7 @@ services:
       - db
 
   db:
-    image: mongo:latest  # Placeholder if user wants mongo
+    image: mongo:latest # Placeholder if user wants mongo
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: examplepassword
