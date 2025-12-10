@@ -8,7 +8,7 @@ import os
 from typing import List, Dict
 
 class VectorStore:
-    def __init__(self, index_path: str = None, dimension: int = 768):
+    def __init__(self, index_path: str = None, dimension: int = 1536):
         self.index_path = index_path
         self.dimension = dimension
         self.index = faiss.IndexFlatIP(dimension) # Inner Product matching cosine similarity if normalized

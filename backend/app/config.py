@@ -17,8 +17,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./sql_app.db"
     
-    # Optional
+    # API Keys
     HF_API_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
+    
+    # Embedding Model (OpenRouter compatible)
+    EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
 
     class Config:
         env_file = ".env"

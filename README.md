@@ -14,7 +14,11 @@ This project implements an Agentic AI system for detecting fake news in Sinhala.
 ### Prerequisites
 - Docker & Docker Compose
 - Python 3.10+
-- Node.js (for CLI tools, optional)
+- **HuggingFace API Key** (Required for Embeddings and Classification)
+
+### Environment Setup
+1. Create a `.env` file in the root directory (see `.env.example`).
+2. Add your key: `HF_API_KEY=hf_...`
 
 ### Running with Docker
 ```bash
