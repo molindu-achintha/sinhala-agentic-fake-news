@@ -14,7 +14,7 @@ from typing import List, Dict, Tuple, Optional
 
 # Try to import sinling components
 try:
-    from sinling import SinhalaTokenizer, SinhalaPOSTagger, SinhalaStemmer
+    from sinling import SinhalaTokenizer, POSTagger, SinhalaStemmer
     SINLING_AVAILABLE = True
 except ImportError:
     SINLING_AVAILABLE = False
@@ -29,7 +29,7 @@ class SinhalaNLP:
     def __init__(self):
         if SINLING_AVAILABLE:
             self.tokenizer = SinhalaTokenizer()
-            self.pos_tagger = SinhalaPOSTagger()
+            self.pos_tagger = POSTagger()
             self.stemmer = SinhalaStemmer()
         else:
             self.tokenizer = None

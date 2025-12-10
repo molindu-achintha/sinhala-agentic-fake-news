@@ -14,3 +14,6 @@ tenacity
 tqdm
 python-dotenv
 sinling
+beautifulsoup4
+lxml
+aiohttp
