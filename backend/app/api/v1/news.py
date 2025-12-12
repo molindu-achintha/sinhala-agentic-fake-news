@@ -190,3 +190,81 @@ async def refresh_news_cache():
         "sources": aggregator.get_available_sources(),
         "timestamp": datetime.now().isoformat()
     }
+
+
+@router.post("/news/index")
+async def index_news_to_vectorstore():
+    """
+    Index scraped news into the FAISS vector store.
+    
+    This makes scraped news available as evidence for claim verification.
+    Generates embeddings for each article and adds them to the index.
+    """
+    from ...agents.langproc_agent import LangProcAgent
+    from ...store.vector_store import VectorStore
+    from ...config import get_settings
+    import numpy as np
+    
+    settings = get_settings()
+    aggregator = get_news_aggregator()
+    nlp = get_sinhala_nlp()
+    
+    # Get scraped articles
+    articles = await aggregator.fetch_all_news(use_cache=True)
+    
+    if not articles:
+        return {
+            "success": False,
+            "message": "No articles to index. Try /news/refresh first.",
+            "indexed_count": 0
+        }
+    
+    # Initialize components
+    lang_proc = LangProcAgent()
+    vector_store = VectorStore(index_path=settings.FAISS_INDEX_PATH, dimension=1536)
+    vector_store.load_index()
+    
+    indexed_count = 0
+    embeddings_list = []
+    docs_list = []
+    
+    for article in articles:
+        try:
+            # Generate embedding for article title + content
+            text = f"{article.title}. {article.content}" if article.content else article.title
+            text = normalize_text(text)
+            
+            embedding = lang_proc.get_embeddings(text)
+            
+            # Prepare document for storage
+            doc = {
+                "id": article.id,
+                "text": text[:500],
+                "title": article.title,
+                "source": article.source,
+                "url": article.url,
+                "scraped_at": article.scraped_at,
+                "type": "live_news"
+            }
+            
+            embeddings_list.append(embedding)
+            docs_list.append(doc)
+            indexed_count += 1
+            
+        except Exception as e:
+            continue
+    
+    # Add to vector store
+    if embeddings_list:
+        embeddings_array = np.array(embeddings_list, dtype='float32')
+        vector_store.add_documents(embeddings_array, docs_list)
+        vector_store.save_index()
+    
+    return {
+        "success": True,
+        "message": f"Indexed {indexed_count} articles into vector store",
+        "indexed_count": indexed_count,
+        "total_in_index": vector_store.index.ntotal,
+        "timestamp": datetime.now().isoformat()
+    }
+

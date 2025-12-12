@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # API Keys
     HF_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
+    PINECONE_API_KEY: str | None = None
+    
+    # Pinecone
+    PINECONE_INDEX_NAME: str = "news-store"
     
     # Embedding Model (OpenRouter compatible)
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"

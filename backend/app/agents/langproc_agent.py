@@ -12,14 +12,14 @@ from ..config import get_settings
 class LangProcAgent:
     def __init__(self):
         settings = get_settings()
-        # OpenRouter API (OpenAI-compatible)
+        # OpenRouter API 
         self.api_url = "https://openrouter.ai/api/v1/embeddings"
         self.model_name = settings.EMBEDDING_MODEL
         self.api_key = settings.OPENROUTER_API_KEY
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:8080", # Required by OpenRouter
+            "HTTP-Referer": "http://localhost:8080", 
             "X-Title": "Sinhala Fake News Detector"
         }
 

@@ -8,16 +8,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../back
 from app.agents.retrieval_agent import RetrievalAgent
 
 def test_retrieve_evidence():
-    # Mock LangProcAgent
     mock_lang = MagicMock()
     mock_lang.get_embeddings.return_value = [0.1] * 768 # Dummy embedding
     
-    # Mock VectorStore inside RetrievalAgent? Hard to mock internal initiation easily without dependency injection.
-    # We will assume integration test style or allow it to fail if no index.
-    # Better: Mock VectorStore class.
-    
-    # For this generation, let's skip deep mocking and just test structure if possible,
-    # or rely on the fact that we can't easily mock the import without `patch`.
     pass
 
 from unittest.mock import patch

@@ -1,5 +1,6 @@
 """
-News Scraper Module for Sinhala News Sources - IMPROVED VERSION
+News Scraper Module for Sinhala News Sources
+Fetches up to 100 articles from each source
 
 Supports:
 - Hiru News
@@ -13,7 +14,7 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 import re
 import hashlib
 from dataclasses import dataclass, asdict
@@ -21,6 +22,9 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Maximum articles per source
+MAX_ARTICLES_PER_SOURCE = 100
 
 
 @dataclass
@@ -44,6 +48,7 @@ class BaseScraper:
     
     SOURCE_NAME = "Unknown"
     BASE_URL = ""
+    MAX_ARTICLES = MAX_ARTICLES_PER_SOURCE
     
     def __init__(self):
         self.headers = {
@@ -51,6 +56,7 @@ class BaseScraper:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
         }
+        self.seen_urls: Set[str] = set()
     
     async def fetch_page(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
         """Fetch HTML content from URL."""
@@ -81,6 +87,25 @@ class BaseScraper:
         sinhala_pattern = re.compile(r'[\u0D80-\u0DFF]')
         return bool(sinhala_pattern.search(text))
     
+    def add_article(self, articles: List[NewsArticle], href: str, title: str) -> bool:
+        """Add article if not duplicate. Returns True if added."""
+        if href in self.seen_urls:
+            return False
+        if len(articles) >= self.MAX_ARTICLES:
+            return False
+        
+        self.seen_urls.add(href)
+        articles.append(NewsArticle(
+            id=self.generate_id(href),
+            title=self.clean_text(title[:200]),
+            content="",
+            url=href,
+            source=self.SOURCE_NAME,
+            published_date=None,
+            scraped_at=datetime.now().isoformat()
+        ))
+        return True
+    
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         """Override in subclasses."""
         raise NotImplementedError
@@ -94,234 +119,248 @@ class HiruNewsScraper(BaseScraper):
     
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         articles = []
+        self.seen_urls.clear()
         
-        # Scrape Sinhala section
-        html = await self.fetch_page(session, f"{self.BASE_URL}/sinhala")
-        if not html:
-            return articles
+        # Just scrape the main Sinhala page - it has many articles
+        urls = [
+            "https://www.hirunews.lk/local-news.php?pageID=1",
+            "https://www.hirunews.lk/local-news.php?pageID=2",
+            "https://www.hirunews.lk/local-news.php?pageID=3",
+            "https://www.hirunews.lk/local-news.php?pageID=4",
+            "https://www.hirunews.lk/local-news.php?pageID=5",
+            "https://www.hirunews.lk/world-news.php?pageID=1",
+            "https://www.hirunews.lk/world-news.php?pageID=2",
+            "https://www.hirunews.lk/",
+        ]
+        
+        for page_url in urls:
+            if len(articles) >= self.MAX_ARTICLES:
+                break
+                
+            html = await self.fetch_page(session, page_url)
+            if not html:
+                continue
+                
+            soup = BeautifulSoup(html, 'lxml')
             
-        soup = BeautifulSoup(html, 'lxml')
-        
-        # Find all article links
-        for link in soup.find_all('a', href=True):
-            try:
-                href = link.get('href', '')
-                title = link.get_text(strip=True)
-                
-                # Only process Sinhala content
-                if not self.is_sinhala_text(title) or len(title) < 15:
-                    continue
-                
-                if not href.startswith('http'):
-                    href = self.BASE_URL + href
-                
-                articles.append(NewsArticle(
-                    id=self.generate_id(href),
-                    title=self.clean_text(title[:200]),
-                    content="",
-                    url=href,
-                    source=self.SOURCE_NAME,
-                    published_date=None,
-                    scraped_at=datetime.now().isoformat()
-                ))
-                
-                if len(articles) >= 15:
+            for link in soup.find_all('a', href=True):
+                if len(articles) >= self.MAX_ARTICLES:
                     break
+                try:
+                    href = link.get('href', '')
+                    title = link.get_text(strip=True)
                     
-            except Exception as e:
-                logger.error(f"Error parsing Hiru article: {e}")
+                    if not self.is_sinhala_text(title) or len(title) < 15:
+                        continue
+                    
+                    if not href.startswith('http'):
+                        href = self.BASE_URL + href
+                    
+                    self.add_article(articles, href, title)
+                        
+                except Exception as e:
+                    continue
                 
         return articles
 
 
 class AdaDeranaScraper(BaseScraper):
-    """Scraper for Ada Derana Sinhala"""
+    """Scraper for Ada Derana Sinhala - Multi-page"""
     
     SOURCE_NAME = "Ada Derana"
     BASE_URL = "https://sinhala.adaderana.lk"
     
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         articles = []
+        self.seen_urls.clear()
         
-        html = await self.fetch_page(session, self.BASE_URL)
-        if not html:
-            return articles
+        # Ada Derana - just use main page
+        urls = [
+            self.BASE_URL,
+        ]
+        
+        for page_url in urls:
+            if len(articles) >= self.MAX_ARTICLES:
+                break
+                
+            html = await self.fetch_page(session, page_url)
+            if not html:
+                continue
+                
+            soup = BeautifulSoup(html, 'lxml')
             
-        soup = BeautifulSoup(html, 'lxml')
-        
-        # Find news headlines
-        for link in soup.find_all('a', href=True):
-            try:
-                href = link.get('href', '')
-                title = link.get_text(strip=True)
-                
-                if not self.is_sinhala_text(title) or len(title) < 15:
-                    continue
-                
-                # Filter for news pages
-                if '/news/' in href or '/hot-news' in href or href.endswith('.php'):
-                    if not href.startswith('http'):
-                        href = self.BASE_URL + href
-                    
-                    articles.append(NewsArticle(
-                        id=self.generate_id(href),
-                        title=self.clean_text(title[:200]),
-                        content="",
-                        url=href,
-                        source=self.SOURCE_NAME,
-                        published_date=None,
-                        scraped_at=datetime.now().isoformat()
-                    ))
-                    
-                if len(articles) >= 15:
+            for link in soup.find_all('a', href=True):
+                if len(articles) >= self.MAX_ARTICLES:
                     break
+                try:
+                    href = link.get('href', '')
+                    title = link.get_text(strip=True)
                     
-            except Exception as e:
-                logger.error(f"Error parsing Derana article: {e}")
+                    if not self.is_sinhala_text(title) or len(title) < 15:
+                        continue
+                    
+                    if '/news/' in href or '/hot-news' in href or href.endswith('.php'):
+                        if not href.startswith('http'):
+                            href = self.BASE_URL + href
+                        
+                        self.add_article(articles, href, title)
+                        
+                except Exception as e:
+                    continue
                 
         return articles
 
 
 class BBCSinhalaScraper(BaseScraper):
-    """Scraper for BBC Sinhala"""
+    """Scraper for BBC Sinhala - Multi-page"""
     
     SOURCE_NAME = "BBC Sinhala"
     BASE_URL = "https://www.bbc.com/sinhala"
     
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         articles = []
+        self.seen_urls.clear()
         
-        html = await self.fetch_page(session, self.BASE_URL)
-        if not html:
-            return articles
+        # BBC Sinhala main pages only (topics may change)
+        urls = [
+            self.BASE_URL,
+            "https://www.bbc.com/sinhala",
+        ]
+        
+        for page_url in urls:
+            if len(articles) >= self.MAX_ARTICLES:
+                break
+                
+            html = await self.fetch_page(session, page_url)
+            if not html:
+                continue
+                
+            soup = BeautifulSoup(html, 'lxml')
             
-        soup = BeautifulSoup(html, 'lxml')
-        
-        # BBC uses various link patterns
-        for link in soup.find_all('a', href=True):
-            try:
-                href = link.get('href', '')
-                title = link.get_text(strip=True)
-                
-                # Only BBC Sinhala articles
-                if '/sinhala/' not in href:
-                    continue
-                    
-                if not self.is_sinhala_text(title) or len(title) < 10:
-                    continue
-                
-                if not href.startswith('http'):
-                    href = "https://www.bbc.com" + href
-                
-                # Skip topic/category pages
-                if '/topics/' in href:
-                    continue
-                
-                articles.append(NewsArticle(
-                    id=self.generate_id(href),
-                    title=self.clean_text(title[:200]),
-                    content="",
-                    url=href,
-                    source=self.SOURCE_NAME,
-                    published_date=None,
-                    scraped_at=datetime.now().isoformat()
-                ))
-                
-                if len(articles) >= 15:
+            for link in soup.find_all('a', href=True):
+                if len(articles) >= self.MAX_ARTICLES:
                     break
+                try:
+                    href = link.get('href', '')
+                    title = link.get_text(strip=True)
                     
-            except Exception as e:
-                logger.error(f"Error parsing BBC article: {e}")
+                    if '/sinhala/' not in href:
+                        continue
+                        
+                    if not self.is_sinhala_text(title) or len(title) < 10:
+                        continue
+                    
+                    if not href.startswith('http'):
+                        href = "https://www.bbc.com" + href
+                    
+                    # Skip topic/category pages
+                    if '/topics/' in href:
+                        continue
+                    
+                    self.add_article(articles, href, title)
+                        
+                except Exception as e:
+                    continue
                 
         return articles
 
 
 class LankadeepaScraper(BaseScraper):
-    """Scraper for Lankadeepa"""
+    """Scraper for Lankadeepa - Multi-page"""
     
     SOURCE_NAME = "Lankadeepa"
     BASE_URL = "https://www.lankadeepa.lk"
     
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         articles = []
+        self.seen_urls.clear()
         
-        html = await self.fetch_page(session, self.BASE_URL)
-        if not html:
-            return articles
+        # Multiple pages
+        urls = [
+            self.BASE_URL,
+            f"{self.BASE_URL}/news",
+            f"{self.BASE_URL}/latest",
+            f"{self.BASE_URL}/business",
+            f"{self.BASE_URL}/sports",
+        ]
+        
+        for page in range(1, 11):
+            urls.append(f"{self.BASE_URL}/news/page/{page}")
+        
+        for page_url in urls:
+            if len(articles) >= self.MAX_ARTICLES:
+                break
+                
+            html = await self.fetch_page(session, page_url)
+            if not html:
+                continue
+                
+            soup = BeautifulSoup(html, 'lxml')
             
-        soup = BeautifulSoup(html, 'lxml')
-        
-        for link in soup.find_all('a', href=True):
-            try:
-                href = link.get('href', '')
-                title = link.get_text(strip=True)
-                
-                if not self.is_sinhala_text(title) or len(title) < 15:
-                    continue
-                
-                if not href.startswith('http'):
-                    href = self.BASE_URL + href
-                
-                articles.append(NewsArticle(
-                    id=self.generate_id(href),
-                    title=self.clean_text(title[:200]),
-                    content="",
-                    url=href,
-                    source=self.SOURCE_NAME,
-                    published_date=None,
-                    scraped_at=datetime.now().isoformat()
-                ))
-                
-                if len(articles) >= 15:
+            for link in soup.find_all('a', href=True):
+                if len(articles) >= self.MAX_ARTICLES:
                     break
+                try:
+                    href = link.get('href', '')
+                    title = link.get_text(strip=True)
                     
-            except Exception as e:
-                logger.error(f"Error parsing Lankadeepa article: {e}")
+                    if not self.is_sinhala_text(title) or len(title) < 15:
+                        continue
+                    
+                    if not href.startswith('http'):
+                        href = self.BASE_URL + href
+                    
+                    self.add_article(articles, href, title)
+                        
+                except Exception as e:
+                    continue
                 
         return articles
 
 
 class DivainaScraper(BaseScraper):
-    """Scraper for Divaina"""
+    """Scraper for Divaina - Multi-page"""
     
     SOURCE_NAME = "Divaina"
     BASE_URL = "https://divaina.lk"
     
     async def scrape(self, session: aiohttp.ClientSession) -> List[NewsArticle]:
         articles = []
+        self.seen_urls.clear()
         
-        html = await self.fetch_page(session, self.BASE_URL)
-        if not html:
-            return articles
+        # Divaina main page only
+        urls = [
+            self.BASE_URL,
+            "https://www.divaina.lk",
+        ]
+        
+        for page_url in urls:
+            if len(articles) >= self.MAX_ARTICLES:
+                break
+                
+            html = await self.fetch_page(session, page_url)
+            if not html:
+                continue
+                
+            soup = BeautifulSoup(html, 'lxml')
             
-        soup = BeautifulSoup(html, 'lxml')
-        
-        for link in soup.find_all('a', href=True):
-            try:
-                href = link.get('href', '')
-                title = link.get_text(strip=True)
-                
-                if not self.is_sinhala_text(title) or len(title) < 15:
-                    continue
-                
-                if not href.startswith('http'):
-                    href = self.BASE_URL + href
-                
-                articles.append(NewsArticle(
-                    id=self.generate_id(href),
-                    title=self.clean_text(title[:200]),
-                    content="",
-                    url=href,
-                    source=self.SOURCE_NAME,
-                    published_date=None,
-                    scraped_at=datetime.now().isoformat()
-                ))
-                
-                if len(articles) >= 15:
+            for link in soup.find_all('a', href=True):
+                if len(articles) >= self.MAX_ARTICLES:
                     break
+                try:
+                    href = link.get('href', '')
+                    title = link.get_text(strip=True)
                     
-            except Exception as e:
-                logger.error(f"Error parsing Divaina article: {e}")
+                    if not self.is_sinhala_text(title) or len(title) < 15:
+                        continue
+                    
+                    if not href.startswith('http'):
+                        href = self.BASE_URL + href
+                    
+                    self.add_article(articles, href, title)
+                        
+                except Exception as e:
+                    continue
                 
         return articles
 
@@ -342,7 +381,7 @@ class NewsAggregator:
         self._cache_ttl = 300  # 5 minutes
     
     async def fetch_all_news(self, use_cache: bool = True) -> List[NewsArticle]:
-        """Fetch news from all sources."""
+        """Fetch news from all sources (up to 100 each, 500 total)."""
         if use_cache and self._cache_timestamp:
             age = (datetime.now() - self._cache_timestamp).total_seconds()
             if age < self._cache_ttl and self._cache:
