@@ -67,7 +67,7 @@ The spread of fake news and misinformation has become a serious problem in the d
 
 Our system uses a multi-agent architecture combined with Retrieval-Augmented Generation to analyze and verify claims made in Sinhala text. The system consists of five specialized agents: the Claim Extractor Agent, the Language Processing Agent, the Retrieval Agent, the Reasoning Agent, and the Verdict Agent. Each agent performs a specific task in the verification pipeline, and they work together to produce a final verdict with a human-readable explanation in Sinhala.
 
-The system uses modern natural language processing techniques including sentence embeddings, vector similarity search, and rule-based reasoning. We use the OpenRouter API to generate embeddings for Sinhala text, which allows us to use powerful multilingual models without requiring local GPU resources. The FAISS library is used for efficient similarity search on a corpus of over 10,000 documents collected from various Sri Lankan news sources.
+The system uses modern natural language processing techniques including sentence embeddings, vector similarity search, and rule-based reasoning. We use the OpenRouter API to generate embeddings for Sinhala text, which allows us to use powerful multilingual models. The Pinecone vector database is used for efficient cloud-based similarity search on both the labeled dataset and live scraped news articles.
 
 Our experimental results show that the system can effectively identify false claims and provide meaningful explanations. The multi-agent approach allows for modular development and easy extension of the system. The web-based interface makes the system accessible to general users, while the API allows integration with other applications.
 
@@ -310,7 +310,7 @@ Format Conversion: We converted all data to a standardized JSON Lines format for
 
 Embedding Generation: We generated vector embeddings for all documents using a multilingual embedding model through the OpenRouter API.
 
-Index Building: We built a FAISS index from the embeddings to enable fast similarity search.
+Index Building: We leverage Pinecone, a cloud-native vector database, to store and index embeddings. Data is segregated into 'dataset' (labeled) and 'live_news' (real-time) namespaces.
 
 3.4 EVALUATION METRICS
 ----------------------
@@ -342,7 +342,7 @@ Input Layer: This includes the web dashboard and API endpoints that receive user
 
 Agent Pipeline: This is the core of the system, consisting of five specialized agents that process the input sequentially. Each agent adds information or analysis to the processing context.
 
-Knowledge Store: This includes the FAISS vector index and associated metadata that provide evidence for claim verification. The knowledge store is built from collected news articles and other trusted sources.
+Knowledge Store: This includes the Pinecone vector database which stores embeddings in two namespaces: 'dataset' for pre-processed labeled data and 'live_news' for real-time scraped articles. This allows for semantic search across both historical and current information.
 
 Output Layer: This formats the results into user-friendly responses including the verdict, explanation in Sinhala, and citations to evidence.
 
@@ -351,7 +351,7 @@ The data flow through the system is as follows:
 1. User submits text through the dashboard or API
 2. The Claim Extractor Agent identifies the main claim
 3. The Language Processing Agent creates embeddings and extracts linguistic features
-4. The Retrieval Agent finds relevant evidence from the knowledge store
+4. The Retrieval Agent searches the Pinecone vector store (both namespaces) for semantically similar evidence
 5. The Reasoning Agent analyzes the evidence and assesses credibility
 6. The Verdict Agent produces the final verdict and explanation
 7. Results are returned to the user
@@ -394,18 +394,19 @@ Output: The agent produces embeddings and linguistic features that are used by o
 Retrieval Agent:
 The Retrieval Agent is responsible for finding relevant evidence from the knowledge store. It uses the claim embedding to search the FAISS index for similar documents.
 
-The agent performs similarity search using the FAISS library, which implements efficient approximate nearest neighbor search. It retrieves the top-K most similar documents along with their similarity scores and metadata.
+The agent performs similarity search using the Pinecone client. It queries both the 'dataset' and 'live_news' namespaces to find the top-K most semantically similar documents to the claim embedding.
 
 Output: The agent produces a list of evidence documents with metadata including source, publication date, and relevance score.
 
 Reasoning Agent:
 The Reasoning Agent analyzes the retrieved evidence to assess its relationship to the claim. It performs several types of analysis.
 
-Source credibility check: The agent assesses the credibility of evidence sources based on metadata such as publication reputation and history.
+Verification Logic (Map/No-Map): The agent implements a robust verification logic based on similarity scores:
+- High Match (>0.7): It checks the labels of the matched documents (True/False) to determine the verdict.
+- Medium Match (0.5-0.7): It flags the claim as needing further verification.
+- No Match (<0.5): It classifies the claim as likely false or unverified due to lack of evidence.
 
-Temporal analysis: The agent checks whether the dates in the evidence are consistent with the claim. For example, evidence dated before the alleged event cannot support the claim.
-
-Content analysis: The agent looks for contradictions or support between the claim and the evidence. This is done using keyword matching and basic semantic analysis.
+Source credibility: The agent also weighs the credibility of sources (e.g., BBC Sinhala, Ada Derana).
 
 Output: The agent produces a reasoning log containing the analysis results and a structured assessment of the evidence.
 
@@ -461,11 +462,11 @@ Python was chosen as the primary language due to its excellent support for machi
 Web Framework: FastAPI
 FastAPI was chosen for the backend API due to its modern design, high performance, and automatic API documentation. FastAPI uses Python type hints to validate input and generate OpenAPI documentation automatically.
 
-Database: SQLite via SQLModel
-For storing metadata and request logs, we use SQLite, a lightweight database that requires no separate server. SQLModel provides an easy-to-use ORM that works well with Pydantic models.
+Database: None
+The initial design considered SQLite, but the current implementation relies entirely on Pinecone for evidence storage and in-memory processing, keeping the architecture stateless and simple.
 
-Vector Store: FAISS
-FAISS (Facebook AI Similarity Search) was chosen for similarity search due to its speed and memory efficiency. It can search millions of vectors in milliseconds.
+Vector Store: Pinecone
+Pinecone was chosen for its managed serverless architecture, allowing scalable and fast similarity search without managing local index files. It supports namespaces which we use to separate static datasets from dynamic live news.
 
 Embedding API: OpenRouter
 OpenRouter provides access to various AI models through a unified API. We use it to generate embeddings without needing local GPU resources.
@@ -499,7 +500,7 @@ backend/
 │   ├── models/
 │   │   └── classifier.py
 │   ├── store/
-│   │   └── vector_store.py
+│   │   └── pinecone_store.py
 │   ├── db/
 │   │   └── models.py
 │   └── utils/
@@ -538,13 +539,10 @@ Response parsing to extract the embedding vector from the API response.
 Caching could be added in future versions to avoid redundant API calls for the same text.
 
 Retrieval Agent Implementation:
-The retrieval agent uses the FAISS library to perform similarity search. The implementation loads the pre-built FAISS index and associated metadata at initialization.
-
-The search process involves:
-1. Normalizing the query embedding for cosine similarity
-2. Calling FAISS search to get top-K indices and distances
-3. Looking up document metadata for each result
-4. Packaging results with scores
+The retrieval agent uses the Pinecone SDK to perform semantic search.
+1. It initializes a connection to the Pinecone index index.
+2. It queries both 'dataset' (labeled) and 'live_news' (unlabeled) namespaces.
+3. It merges results, sorts them by cosine similarity score, and returns the top matches.
 
 Reasoning Agent Implementation:
 The reasoning agent performs multiple checks on the retrieved evidence.
@@ -570,17 +568,15 @@ The Sinhala explanation is generated using templates that are filled in based on
 5.4 VECTOR STORE AND RETRIEVAL SYSTEM
 -------------------------------------
 
-The vector store is built during the preprocessing phase. The process involves:
+The vector store is powered by Pinecone. The process involves:
 
-Document Loading: Documents are loaded from the processed JSONL file. Each document contains text content and metadata.
+Document Loading & Indexing: 
+1. The static labeled dataset is loaded and indexed into the 'dataset' namespace.
+2. Live news is scraped, preprocessed (NLP), and indexed into the 'live_news' namespace.
 
-Embedding Generation: For each document, a 1536-dimensional embedding is generated using the OpenRouter API. This is done in a loop with rate limiting to avoid exceeding API limits.
+Embedding Generation: We use OpenRouter (openai/text-embedding-3-small) to generate 1536-dimensional vectors for all content.
 
-Index Building: All embeddings are collected into a numpy array and added to a FAISS index. We use IndexFlatIP (inner product) since embeddings are normalized, making inner product equivalent to cosine similarity.
-
-Persistence: The FAISS index is saved to disk, along with a pickle file containing document metadata. This allows the index to be loaded quickly when the server starts.
-
-Search Process: At query time, the query embedding is normalized and compared against all document embeddings using FAISS. The top-K most similar documents are returned with their similarity scores.
+Search Process: At query time, the claim embedding is sent to Pinecone, which performs a cosine similarity search across namespaces to find the most relevant evidence.
 
 5.5 API DESIGN AND ENDPOINTS
 ----------------------------

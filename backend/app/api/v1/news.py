@@ -58,7 +58,7 @@ def preprocess_article(article: NewsArticle) -> ProcessedNewsItem:
     pos_tags = nlp.pos_tag(text)
     entities = nlp.extract_entities(text)
     
-    # Handle nested POS tags from sinling (returns list of lists)
+    # Handle nested POS tags from sinling 
     nouns = []
     verbs = []
     try:
@@ -109,9 +109,9 @@ async def get_current_news(
     """
     Fetch current news from Sinhala news sources.
     
-    - **source**: Optional filter by source (e.g., "Hiru News", "BBC Sinhala")
-    - **limit**: Maximum number of articles to return
-    - **preprocess**: Whether to apply NLP preprocessing
+    - source: Optional filter by source (e.g., "Hiru News", "BBC Sinhala")
+    - limit: Maximum number of articles to return
+    - preprocess: Whether to apply NLP preprocessing
     
     Returns news articles with optional NLP features (entities, POS tags, etc.)
     """
