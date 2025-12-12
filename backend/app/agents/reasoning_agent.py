@@ -1,11 +1,9 @@
 """
-Enhanced Reasoning Agent using Pinecone and preprocessed labeled data.
+Reasoning Agent with Map/No-Map Verification Logic.
 
-Uses:
-- Evidence retrieved from Pinecone (dataset + live_news namespaces)
-- Labels from preprocessed data (fake, true, misleading, etc.)
-- Source credibility scoring
-- Content similarity analysis
+Logic:
+1. If claim MAPS to existing data (high similarity) → Check labels
+2. If claim DOES NOT MAP (no similar data) → Likely false/unverified
 """
 from typing import List, Dict
 from collections import Counter
@@ -15,14 +13,17 @@ class ReasoningAgent:
     """
     Multi-agent reasoning for claim verification.
     
-    Analyzes:
-    1. Labels from preprocessed evidence (fake/true/misleading)
-    2. Source credibility (trusted sources)
-    3. Evidence similarity scores
-    4. Content analysis
+    Core Logic:
+    - HIGH MATCH (>0.7 similarity): Check metadata labels
+    - MEDIUM MATCH (0.5-0.7): Needs verification
+    - NO MATCH (<0.5): Likely false (no supporting evidence)
     """
     
-    # Trusted news sources (higher credibility)
+    # Similarity thresholds
+    HIGH_SIMILARITY_THRESHOLD = 0.7
+    MEDIUM_SIMILARITY_THRESHOLD = 0.5
+    
+    # Trusted news sources
     TRUSTED_SOURCES = [
         "BBC Sinhala",
         "Ada Derana", 
@@ -31,7 +32,7 @@ class ReasoningAgent:
         "ITN News"
     ]
     
-    # Label weights for verdict calculation
+    # Label weights
     LABEL_WEIGHTS = {
         "fake": -1.0,
         "false": -1.0,
@@ -50,240 +51,215 @@ class ReasoningAgent:
     
     def reason(self, claim: str, evidence: List[Dict]) -> Dict:
         """
-        Perform multi-agent reasoning on claim and evidence.
+        Perform verification reasoning.
         
         Args:
             claim: The claim text to verify
             evidence: List of evidence documents from Pinecone
-                      Each doc has: id, text, title, source, label, score, similarity
         
         Returns:
-            Reasoning results with support/contradiction analysis
+            Reasoning results with match analysis
         """
         if not evidence:
-            return self._empty_result()
+            return self._no_evidence_result()
         
-        # Agent A: Source Credibility Analysis
-        source_analysis = self._analyze_sources(evidence)
+        # Step 1: Analyze similarity scores (Does it MAP?)
+        match_analysis = self._analyze_matches(evidence)
         
-        # Agent B: Label-based Analysis 
-        label_analysis = self._analyze_labels(evidence)
+        # Step 2: Based on match level, determine verification path
+        if match_analysis['match_level'] == 'high':
+            # HIGH MATCH: Check metadata labels
+            label_analysis = self._analyze_labels(evidence)
+            source_analysis = self._analyze_sources(evidence)
+            verdict_recommendation = self._determine_verdict_from_labels(label_analysis)
         
-        # Agent C: Similarity Score Analysis
-        similarity_analysis = self._analyze_similarity(evidence)
+        elif match_analysis['match_level'] == 'medium':
+            # MEDIUM MATCH: Needs verification
+            label_analysis = self._analyze_labels(evidence)
+            source_analysis = self._analyze_sources(evidence)
+            verdict_recommendation = "needs_verification"
         
-        # Agent D: Content Analysis
-        content_analysis = self._analyze_content(claim, evidence)
-        
-        # Combine all analyses
-        combined_score = self._calculate_combined_score(
-            source_analysis,
-            label_analysis, 
-            similarity_analysis
-        )
-        
-        # Determine overall stance
-        stance = self._determine_stance(combined_score, label_analysis)
+        else:
+            # NO MATCH: Likely false (unverified)
+            label_analysis = {"label_counts": {}, "support_score": 0, "has_conflicts": False}
+            source_analysis = {"trusted_count": 0, "credibility_score": 0}
+            verdict_recommendation = "likely_false"
         
         return {
-            "summary": self._generate_summary(stance, evidence),
-            "combined_score": round(combined_score, 3),
-            "stance": stance,
-            "evidence_count": len(evidence),
-            "evidence_gaps": self._identify_gaps(evidence),
-            "conflicting_evidence": label_analysis["has_conflicts"],
-            "source_analysis": source_analysis,
+            "summary": self._generate_summary(match_analysis, verdict_recommendation),
+            "match_analysis": match_analysis,
             "label_analysis": label_analysis,
-            "similarity_analysis": similarity_analysis,
+            "source_analysis": source_analysis,
+            "verdict_recommendation": verdict_recommendation,
+            "evidence_count": len(evidence),
+            "conflicting_evidence": label_analysis.get("has_conflicts", False),
             "statments": [
                 {
-                    "step": "Source Credibility",
-                    "result": f"{source_analysis['trusted_count']}/{len(evidence)} from trusted sources. "
-                              f"Credibility: {source_analysis['credibility_score']:.1%}"
+                    "step": "Similarity Check",
+                    "result": f"Match level: {match_analysis['match_level'].upper()}. "
+                              f"Top similarity: {match_analysis['top_similarity']:.1%}"
                 },
                 {
-                    "step": "Label Analysis (Preprocessed Data)",
-                    "result": f"Labels found: {label_analysis['label_counts']}. "
-                              f"Support score: {label_analysis['support_score']:.2f}"
+                    "step": "Evidence Mapping",
+                    "result": f"Found {match_analysis['high_matches']} high matches, "
+                              f"{match_analysis['medium_matches']} medium matches"
                 },
                 {
-                    "step": "Similarity Analysis",
-                    "result": f"Avg similarity: {similarity_analysis['avg_similarity']:.1%}. "
-                              f"Top match: {similarity_analysis['top_score']:.1%}"
+                    "step": "Label Verification" if match_analysis['match_level'] != 'none' else "No Match Found",
+                    "result": self._get_label_step_result(match_analysis, label_analysis, verdict_recommendation)
                 },
                 {
-                    "step": "Content Analysis",
-                    "result": f"Analyzed {len(evidence)} documents. {content_analysis['summary']}"
-                },
-                {
-                    "step": "Final Assessment",
-                    "result": f"Combined score: {combined_score:.3f}. Stance: {stance}"
+                    "step": "Verdict Recommendation",
+                    "result": f"Recommended: {verdict_recommendation.upper().replace('_', ' ')}"
                 }
             ]
         }
     
-    def _analyze_sources(self, evidence: List[Dict]) -> Dict:
-        """Analyze source credibility."""
-        trusted_count = 0
-        source_counts = Counter()
+    def _analyze_matches(self, evidence: List[Dict]) -> Dict:
+        """Analyze how well the claim maps to existing data."""
+        scores = [doc.get('score', 0) for doc in evidence]
         
-        for doc in evidence:
-            source = doc.get('source', 'unknown')
-            source_counts[source] += 1
-            if source in self.TRUSTED_SOURCES:
-                trusted_count += 1
+        if not scores:
+            return {
+                "match_level": "none",
+                "top_similarity": 0,
+                "avg_similarity": 0,
+                "high_matches": 0,
+                "medium_matches": 0
+            }
         
-        credibility_score = trusted_count / len(evidence) if evidence else 0
+        top_similarity = max(scores)
+        avg_similarity = sum(scores) / len(scores)
+        high_matches = sum(1 for s in scores if s >= self.HIGH_SIMILARITY_THRESHOLD)
+        medium_matches = sum(1 for s in scores if self.MEDIUM_SIMILARITY_THRESHOLD <= s < self.HIGH_SIMILARITY_THRESHOLD)
+        
+        # Determine match level based on best match
+        if top_similarity >= self.HIGH_SIMILARITY_THRESHOLD:
+            match_level = "high"
+        elif top_similarity >= self.MEDIUM_SIMILARITY_THRESHOLD:
+            match_level = "medium"
+        else:
+            match_level = "none"
         
         return {
-            "trusted_count": trusted_count,
-            "total_count": len(evidence),
-            "credibility_score": credibility_score,
-            "source_distribution": dict(source_counts)
+            "match_level": match_level,
+            "top_similarity": top_similarity,
+            "avg_similarity": avg_similarity,
+            "high_matches": high_matches,
+            "medium_matches": medium_matches
         }
     
     def _analyze_labels(self, evidence: List[Dict]) -> Dict:
-        """Analyze labels from preprocessed data."""
+        """Analyze labels from matched documents."""
         label_counts = Counter()
         weighted_scores = []
+        labeled_evidence = []
         
         for doc in evidence:
             label = doc.get('label', '').lower().strip()
-            label_counts[label if label else 'unlabeled'] += 1
-            
-            # Get weight for this label
-            weight = self.LABEL_WEIGHTS.get(label, 0.0)
             similarity = doc.get('score', 0.5)
             
-            # Weighted by similarity score
-            weighted_scores.append(weight * similarity)
+            if label and label != 'unknown':
+                label_counts[label] += 1
+                weight = self.LABEL_WEIGHTS.get(label, 0.0)
+                weighted_scores.append(weight * similarity)
+                labeled_evidence.append(doc)
         
-        # Calculate support score (-1 to 1)
+        # Calculate support score
         support_score = sum(weighted_scores) / len(weighted_scores) if weighted_scores else 0
         
-        # Check for conflicts (both fake and true labels present)
+        # Check for conflicts
         has_fake = any(l in ['fake', 'false'] for l in label_counts.keys())
         has_true = any(l in ['true', 'real', 'verified'] for l in label_counts.keys())
-        has_conflicts = has_fake and has_true
         
         return {
             "label_counts": dict(label_counts),
             "support_score": support_score,
-            "has_conflicts": has_conflicts,
+            "has_conflicts": has_fake and has_true,
+            "labeled_count": len(labeled_evidence),
             "fake_count": label_counts.get('fake', 0) + label_counts.get('false', 0),
             "true_count": label_counts.get('true', 0) + label_counts.get('real', 0)
         }
     
-    def _analyze_similarity(self, evidence: List[Dict]) -> Dict:
-        """Analyze similarity scores from Pinecone."""
-        scores = [doc.get('score', 0) for doc in evidence]
-        
-        if not scores:
-            return {"avg_similarity": 0, "top_score": 0, "min_score": 0}
+    def _analyze_sources(self, evidence: List[Dict]) -> Dict:
+        """Analyze source credibility."""
+        trusted_count = sum(1 for doc in evidence if doc.get('source') in self.TRUSTED_SOURCES)
         
         return {
-            "avg_similarity": sum(scores) / len(scores),
-            "top_score": max(scores),
-            "min_score": min(scores),
-            "high_similarity_count": sum(1 for s in scores if s > 0.7)
+            "trusted_count": trusted_count,
+            "total_count": len(evidence),
+            "credibility_score": trusted_count / len(evidence) if evidence else 0
         }
     
-    def _analyze_content(self, claim: str, evidence: List[Dict]) -> Dict:
-        """Analyze content of evidence documents."""
-        # Simple content analysis
-        evidence_texts = [doc.get('text', '') or doc.get('title', '') for doc in evidence]
-        
-        # Count evidence types
-        live_news_count = sum(1 for doc in evidence if doc.get('type') == 'live_news')
-        dataset_count = len(evidence) - live_news_count
-        
-        return {
-            "summary": f"{dataset_count} from dataset, {live_news_count} from live news.",
-            "live_news_count": live_news_count,
-            "dataset_count": dataset_count
-        }
-    
-    def _calculate_combined_score(
-        self, 
-        source_analysis: Dict, 
-        label_analysis: Dict,
-        similarity_analysis: Dict
-    ) -> float:
-        """Calculate combined reasoning score."""
-        # Weights for different factors
-        source_weight = 0.2
-        label_weight = 0.5  # Labels are most important
-        similarity_weight = 0.3
-        
-        # Normalize scores to 0-1 range
-        source_score = source_analysis['credibility_score']
-        label_score = (label_analysis['support_score'] + 1) / 2  # -1 to 1 -> 0 to 1
-        similarity_score = similarity_analysis['avg_similarity']
-        
-        combined = (
-            source_weight * source_score +
-            label_weight * label_score +
-            similarity_weight * similarity_score
-        )
-        
-        return combined
-    
-    def _determine_stance(self, combined_score: float, label_analysis: Dict) -> str:
-        """Determine overall stance on the claim."""
+    def _determine_verdict_from_labels(self, label_analysis: Dict) -> str:
+        """Determine verdict based on labels of matched documents."""
         support_score = label_analysis['support_score']
+        has_conflicts = label_analysis['has_conflicts']
+        labeled_count = label_analysis['labeled_count']
         
-        if support_score < -0.3:
-            return "likely_fake"
+        # If no labeled evidence, check live news only
+        if labeled_count == 0:
+            return "needs_verification"
+        
+        # If conflicting evidence
+        if has_conflicts:
+            return "needs_verification"
+        
+        # Based on support score
+        if support_score <= -0.5:
+            return "false"
         elif support_score < 0:
-            return "possibly_misleading"
+            return "likely_false"
         elif support_score < 0.3:
             return "needs_verification"
-        elif support_score < 0.6:
-            return "possibly_true"
-        else:
+        elif support_score < 0.7:
             return "likely_true"
+        else:
+            return "true"
     
-    def _identify_gaps(self, evidence: List[Dict]) -> List[str]:
-        """Identify gaps in evidence."""
-        gaps = []
-        
-        if len(evidence) < 3:
-            gaps.append("Limited evidence found (less than 3 sources)")
-        
-        # Check for low similarity
-        avg_sim = sum(doc.get('score', 0) for doc in evidence) / len(evidence) if evidence else 0
-        if avg_sim < 0.5:
-            gaps.append("Evidence has low relevance to claim")
-        
-        # Check for unlabeled evidence
-        unlabeled = sum(1 for doc in evidence if not doc.get('label'))
-        if unlabeled == len(evidence):
-            gaps.append("No labeled evidence from dataset (only live news)")
-        
-        return gaps
-    
-    def _generate_summary(self, stance: str, evidence: List[Dict]) -> str:
+    def _generate_summary(self, match_analysis: Dict, verdict: str) -> str:
         """Generate human-readable summary."""
-        summaries = {
-            "likely_fake": "Evidence suggests this claim is likely FALSE. Multiple sources indicate misinformation.",
-            "possibly_misleading": "This claim appears to be MISLEADING. Some evidence contradicts the claim.",
-            "needs_verification": "This claim NEEDS VERIFICATION. Evidence is inconclusive.",
-            "possibly_true": "This claim is POSSIBLY TRUE. Some supporting evidence found.",
-            "likely_true": "Evidence suggests this claim is likely TRUE. Multiple trusted sources confirm."
-        }
+        match_level = match_analysis['match_level']
         
-        return summaries.get(stance, "Unable to determine claim veracity.")
+        if match_level == 'none':
+            return "NO MATCHING EVIDENCE FOUND. This claim cannot be verified with existing data. Likely FALSE or unverified."
+        
+        elif match_level == 'medium':
+            return "PARTIAL MATCH FOUND. Some related content exists but requires further verification."
+        
+        else:  # high match
+            verdicts = {
+                "true": "VERIFIED TRUE. Claim matches verified true content in database.",
+                "likely_true": "LIKELY TRUE. Matched content suggests claim is accurate.",
+                "needs_verification": "NEEDS VERIFICATION. Mixed or insufficient evidence.",
+                "likely_false": "LIKELY FALSE. Matched content suggests claim is inaccurate.",
+                "false": "VERIFIED FALSE. Claim matches known false/fake content in database."
+            }
+            return verdicts.get(verdict, "Unable to determine.")
     
-    def _empty_result(self) -> Dict:
-        """Return empty result when no evidence found."""
+    def _get_label_step_result(self, match_analysis: Dict, label_analysis: Dict, verdict: str) -> str:
+        """Get result text for label verification step."""
+        if match_analysis['match_level'] == 'none':
+            return "No similar content in database. Cannot verify against known data."
+        
+        labeled = label_analysis['labeled_count']
+        if labeled > 0:
+            return f"Checked {labeled} labeled documents. Labels: {label_analysis['label_counts']}"
+        else:
+            return "Matched live news only (no labeled dataset matches)."
+    
+    def _no_evidence_result(self) -> Dict:
+        """Return result when no evidence found."""
         return {
-            "summary": "No evidence found to verify this claim.",
-            "combined_score": 0,
-            "stance": "no_evidence",
+            "summary": "NO EVIDENCE RETRIEVED. Cannot verify this claim. Likely FALSE or completely new information.",
+            "match_analysis": {"match_level": "none", "top_similarity": 0},
+            "label_analysis": {},
+            "source_analysis": {},
+            "verdict_recommendation": "likely_false",
             "evidence_count": 0,
-            "evidence_gaps": ["No evidence retrieved from Pinecone"],
             "conflicting_evidence": False,
             "statments": [
-                {"step": "Evidence Retrieval", "result": "No matching documents found."}
+                {"step": "Evidence Retrieval", "result": "No matching documents found in Pinecone."},
+                {"step": "Verdict", "result": "LIKELY FALSE - No supporting evidence exists."}
             ]
         }
