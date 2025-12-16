@@ -40,7 +40,7 @@ The API will be available at `http://localhost:8080/v1/predict`.
     # Build embeddings
     python data/preprocessing/build_embeddings.py
     ```
-3. **Train Classifier** (Optional):
+3. **Train Classifier**:
     ```bash
     python training/train_classifier.py --data data/dataset/processed.jsonl
     ```
