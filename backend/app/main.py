@@ -3,7 +3,7 @@ Main FastAPI application.
 """
 from fastapi import FastAPI
 from .config import get_settings
-from .api.v1 import predict, health, news
+from .api.v1 import predict, health, news, evaluate
 
 settings = get_settings()
 
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(predict.router, prefix="/v1", tags=["Prediction"])
 app.include_router(news.router, prefix="/v1", tags=["News"])
+app.include_router(evaluate.router, prefix="/v1", tags=["Evaluation"])
 
 
 @app.get("/")

@@ -1,0 +1,74 @@
+[
+    {
+        "text": "ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි",
+        "label": "true",
+        "source": "test",
+        "note": "Approximate Sri Lanka population - verifiable fact"
+    },
+    {
+        "text": "කොළඹ නගරය ශ්‍රී ලංකාවේ වාණිජ අගනගරයකි",
+        "label": "true",
+        "source": "test",
+        "note": "Colombo is the commercial capital - true"
+    },
+    {
+        "text": "ශ්‍රී ලංකාව 1948 වසරේ නිදහස ලැබුවේය",
+        "label": "true",
+        "source": "test",
+        "note": "Sri Lanka gained independence in 1948 - true"
+    },
+    {
+        "text": "ශ්‍රී ලංකාවේ නිල භාෂා සිංහල හා දෙමළ වේ",
+        "label": "true",
+        "source": "test",
+        "note": "Official languages are Sinhala and Tamil - true"
+    },
+    {
+        "text": "රුපියල 1000 නෝට්ටුවක් තහනම් කර ඇත",
+        "label": "false",
+        "source": "test",
+        "note": "Rs.1000 note banned - false rumor"
+    },
+    {
+        "text": "හෙට සිට පෙට්‍රල් මිල රුපියල් 500 දක්වා ඉහළ යයි",
+        "label": "false",
+        "source": "test",
+        "note": "Extreme petrol price increase - false"
+    },
+    {
+        "text": "ලංකාවේ ජනාධිපතිවරණය අහෝසි කර ඇත",
+        "label": "false",
+        "source": "test",
+        "note": "Presidential election cancelled - false"
+    },
+    {
+        "text": "කොවිඩ් මගින් 100% ක් මරණයට පත් වේ",
+        "label": "false",
+        "source": "test",
+        "note": "COVID 100% fatal - false"
+    },
+    {
+        "text": "ශ්‍රී ලංකා ක්‍රිකට් කණ්ඩායම ලෝක ශූරයන් වී ඇත",
+        "label": "misleading",
+        "source": "test",
+        "note": "Sri Lanka cricket world champions - partially true (1996)"
+    },
+    {
+        "text": "රාජපක්ෂ ආණ්ඩුව රටට හොඳ දේ කළේය",
+        "label": "misleading",
+        "source": "test",
+        "note": "Opinion/political statement - misleading/subjective"
+    },
+    {
+        "text": "ඊයේ මහ වැස්සක් ඇවිත් ගංවතුර ඇති විය",
+        "label": "needs_verification",
+        "source": "test",
+        "note": "Recent flood claim - needs verification"
+    },
+    {
+        "text": "අලුත් බදු ක්‍රමයක් ලබන සතියේ එයි",
+        "label": "needs_verification",
+        "source": "test",
+        "note": "New tax system announcement - needs verification"
+    }
+]

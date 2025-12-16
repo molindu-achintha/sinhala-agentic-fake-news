@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8010';
+const API_BASE = 'http://localhost:8000';
 
 // Status display element
 let statusDiv = null;
