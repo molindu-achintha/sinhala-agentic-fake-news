@@ -1,5 +1,11 @@
 """
-News API Endpoint - Fetches and preprocesses current Sinhala news.
+news.py - News API Endpoint
+
+This module provides endpoints for fetching and indexing news.
+It handles:
+1. Fetching news from multiple Sinhala sources
+2. NLP preprocessing of articles
+3. Indexing news into the vector database
 """
 from fastapi import APIRouter, Query, BackgroundTasks
 from pydantic import BaseModel
@@ -23,7 +29,6 @@ class ProcessedNewsItem(BaseModel):
     source: str
     published_date: Optional[str]
     scraped_at: str
-    # NLP Features
     entities: Dict[str, List[str]]
     nouns: List[str]
     verbs: List[str]
@@ -46,7 +51,14 @@ class SourcesResponse(BaseModel):
 
 
 def preprocess_article(article: NewsArticle) -> ProcessedNewsItem:
-    """Apply NLP preprocessing to a news article."""
+    """
+    Apply NLP preprocessing to a news article.
+    
+    This function extracts entities, POS tags, and other
+    NLP features from the article text.
+    """
+    print("[news] Preprocessing article:", article.title[:30], "...")
+    
     nlp = get_sinhala_nlp()
     
     # Combine title and content for analysis
@@ -58,13 +70,12 @@ def preprocess_article(article: NewsArticle) -> ProcessedNewsItem:
     pos_tags = nlp.pos_tag(text)
     entities = nlp.extract_entities(text)
     
-    # Handle nested POS tags from sinling 
+    # Extract nouns and verbs from POS tags
     nouns = []
     verbs = []
     try:
         for item in pos_tags:
             if isinstance(item, list):
-                # sinling format: [[('char', 'TAG'), ...], ...]
                 for subitem in item:
                     if isinstance(subitem, tuple) and len(subitem) == 2:
                         word, tag = subitem
@@ -73,7 +84,6 @@ def preprocess_article(article: NewsArticle) -> ProcessedNewsItem:
                         elif tag in ['VB', 'VFM']:
                             verbs.append(word)
             elif isinstance(item, tuple) and len(item) == 2:
-                # fallback format: [('word', 'TAG'), ...]
                 word, tag = item
                 if tag in ['NN', 'NNP']:
                     nouns.append(word)
@@ -109,12 +119,16 @@ async def get_current_news(
     """
     Fetch current news from Sinhala news sources.
     
-    - source: Optional filter by source (e.g., "Hiru News", "BBC Sinhala")
-    - limit: Maximum number of articles to return
-    - preprocess: Whether to apply NLP preprocessing
+    Args:
+        source: Optional filter by source
+        limit: Maximum number of articles to return
+        preprocess: Whether to apply NLP preprocessing
     
-    Returns news articles with optional NLP features (entities, POS tags, etc.)
+    Returns:
+        NewsResponse with articles and metadata
     """
+    print("[news] Fetching news, source:", source, "limit:", limit)
+    
     aggregator = get_news_aggregator()
     
     if source:
@@ -122,21 +136,24 @@ async def get_current_news(
     else:
         articles = await aggregator.fetch_all_news()
     
+    print("[news] Fetched", len(articles), "articles")
+    
     # Limit results
     articles = articles[:limit]
     
     # Preprocess if requested
     if preprocess and articles:
+        print("[news] Preprocessing articles")
         processed = []
         for article in articles:
             try:
                 processed.append(preprocess_article(article))
             except Exception as e:
-                # Skip articles that fail preprocessing
+                print("[news] Failed to preprocess article:", str(e))
                 continue
         articles_response = processed
     else:
-        # Return raw articles as ProcessedNewsItem with empty NLP fields
+        # Return raw articles
         articles_response = [
             ProcessedNewsItem(
                 id=a.id,
@@ -154,6 +171,8 @@ async def get_current_news(
             ) for a in articles
         ]
     
+    print("[news] Returning", len(articles_response), "articles")
+    
     return NewsResponse(
         success=True,
         count=len(articles_response),
@@ -170,8 +189,11 @@ async def get_news_sources():
     
     Returns names of all supported Sinhala news providers.
     """
+    print("[news] Getting available sources")
     aggregator = get_news_aggregator()
-    return SourcesResponse(sources=aggregator.get_available_sources())
+    sources = aggregator.get_available_sources()
+    print("[news] Available sources:", sources)
+    return SourcesResponse(sources=sources)
 
 
 @router.get("/news/refresh")
@@ -180,9 +202,13 @@ async def refresh_news_cache():
     Force refresh the news cache.
     
     Scrapes all sources again, bypassing the cache.
+    Returns the number of articles fetched.
     """
+    print("[news] Refreshing news cache")
     aggregator = get_news_aggregator()
     articles = await aggregator.fetch_all_news(use_cache=False)
+    
+    print("[news] Refreshed with", len(articles), "articles")
     
     return {
         "success": True,
@@ -193,26 +219,28 @@ async def refresh_news_cache():
 
 
 @router.post("/news/index")
-async def index_news_to_vectorstore():
+async def index_news_to_pinecone():
     """
-    Index scraped news into the FAISS vector store.
+    Index scraped news into Pinecone vector store.
     
     This makes scraped news available as evidence for claim verification.
-    Generates embeddings for each article and adds them to the index.
+    Generates embeddings for each article and adds them to the live_news namespace.
     """
+    print("[news] Starting news indexing to Pinecone")
+    
     from ...agents.langproc_agent import LangProcAgent
-    from ...store.vector_store import VectorStore
+    from ...store.pinecone_store import get_pinecone_store
     from ...config import get_settings
-    import numpy as np
     
     settings = get_settings()
     aggregator = get_news_aggregator()
-    nlp = get_sinhala_nlp()
     
     # Get scraped articles
     articles = await aggregator.fetch_all_news(use_cache=True)
+    print("[news] Found", len(articles), "articles to index")
     
     if not articles:
+        print("[news] No articles to index")
         return {
             "success": False,
             "message": "No articles to index. Try /news/refresh first.",
@@ -221,8 +249,16 @@ async def index_news_to_vectorstore():
     
     # Initialize components
     lang_proc = LangProcAgent()
-    vector_store = VectorStore(index_path=settings.FAISS_INDEX_PATH, dimension=1536)
-    vector_store.load_index()
+    
+    try:
+        pinecone_store = get_pinecone_store()
+    except Exception as e:
+        print("[news] Failed to connect to Pinecone:", str(e))
+        return {
+            "success": False,
+            "message": f"Failed to connect to Pinecone: {str(e)}",
+            "indexed_count": 0
+        }
     
     indexed_count = 0
     embeddings_list = []
@@ -230,7 +266,7 @@ async def index_news_to_vectorstore():
     
     for article in articles:
         try:
-            # Generate embedding for article title + content
+            # Generate embedding for article
             text = f"{article.title}. {article.content}" if article.content else article.title
             text = normalize_text(text)
             
@@ -239,32 +275,33 @@ async def index_news_to_vectorstore():
             # Prepare document for storage
             doc = {
                 "id": article.id,
-                "text": text[:500],
+                "text": text[:1000],
                 "title": article.title,
                 "source": article.source,
                 "url": article.url,
-                "scraped_at": article.scraped_at,
-                "type": "live_news"
+                "label": "",
+                "type": "live_news",
+                "scraped_at": article.scraped_at
             }
             
-            embeddings_list.append(embedding)
+            embeddings_list.append(embedding.tolist())
             docs_list.append(doc)
             indexed_count += 1
             
         except Exception as e:
+            print("[news] Failed to process article:", str(e))
             continue
     
-    # Add to vector store
+    # Add to Pinecone
     if embeddings_list:
-        embeddings_array = np.array(embeddings_list, dtype='float32')
-        vector_store.add_documents(embeddings_array, docs_list)
-        vector_store.save_index()
+        print("[news] Upserting", len(embeddings_list), "articles to Pinecone")
+        pinecone_store.upsert_documents(docs_list, embeddings_list, namespace="live_news")
+    
+    print("[news] Indexing complete,", indexed_count, "articles indexed")
     
     return {
         "success": True,
-        "message": f"Indexed {indexed_count} articles into vector store",
+        "message": f"Indexed {indexed_count} articles into Pinecone",
         "indexed_count": indexed_count,
-        "total_in_index": vector_store.index.ntotal,
         "timestamp": datetime.now().isoformat()
     }
-

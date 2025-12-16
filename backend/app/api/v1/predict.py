@@ -1,10 +1,19 @@
 """
-Prediction endpoint with Pinecone Vector Search.
+predict.py - Prediction API Endpoint
+
+This module provides the main prediction endpoint for fake news detection.
+It orchestrates the multi-agent pipeline:
+1. Claim Extraction - Extract verifiable claim from input
+2. Embedding Generation - Convert claim to vector
+3. Evidence Retrieval - Search Pinecone for similar content
+4. Reasoning - Analyze evidence and determine verdict
+5. Verdict Generation - Produce final result with explanations
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
+
 from ...agents.claim_extractor import ClaimExtractorAgent
 from ...agents.langproc_agent import LangProcAgent
 from ...agents.reasoning_agent import ReasoningAgent
@@ -13,21 +22,25 @@ from ...config import get_settings
 
 router = APIRouter()
 
-# Instantiate agents
+# Initialize agents (singleton pattern)
+print("[predict] Initializing agents")
 lang_proc = LangProcAgent()
 claim_extractor = ClaimExtractorAgent()
 reasoning_agent = ReasoningAgent()
 verdict_agent = VerdictAgent()
+print("[predict] All agents initialized")
 
 
 class PredictRequest(BaseModel):
+    """Request model for prediction endpoint."""
     text: str
     source: Optional[str] = None
     top_k: int = 5
-    use_pinecone: bool = True  # Use Pinecone by default
+    use_pinecone: bool = True
 
 
 class PredictResponse(BaseModel):
+    """Response model for prediction endpoint."""
     claim: dict
     retrieved_evidence: List[dict]
     reasoning: dict
@@ -37,28 +50,44 @@ class PredictResponse(BaseModel):
 @router.post("/predict", response_model=PredictResponse)
 async def predict(request: PredictRequest):
     """
-    Verify a claim using Pinecone vector search.
+    Verify a claim using the multi-agent pipeline.
     
+    This endpoint:
     1. Extracts claim from input text
-    2. Generates embedding for claim
+    2. Generates embedding for claim  
     3. Searches Pinecone for similar documents
     4. Reasons about the claim with evidence
-    5. Returns verdict
+    5. Returns verdict with explanations
+    
+    Args:
+        request: PredictRequest with text to verify
+        
+    Returns:
+        PredictResponse with claim, evidence, reasoning, verdict
     """
+    print("=" * 50)
+    print("[predict] New prediction request received")
+    print("[predict] Text length:", len(request.text))
+    
     settings = get_settings()
     
-    # 1. Extract Claim
+    # Step 1: Extract Claim
+    print("[predict] Step 1: Extracting claim")
     claim = claim_extractor.extract_claim(request.text)
     claim_text = claim['claim_text']
+    print("[predict] Claim extracted:", claim_text[:50], "...")
     
-    # 2. Generate claim embedding
+    # Step 2: Generate embedding for claim
+    print("[predict] Step 2: Generating embedding")
     from ...utils.text_normalize import normalize_text
     normalized_claim = normalize_text(claim_text)
     claim_embedding = lang_proc.get_embeddings(normalized_claim)
+    print("[predict] Embedding dimension:", len(claim_embedding))
     
     evidence = []
     
-    # 3. Search Pinecone
+    # Step 3: Search Pinecone for evidence
+    print("[predict] Step 3: Searching for evidence")
     if request.use_pinecone and settings.PINECONE_API_KEY:
         try:
             from ...store.pinecone_store import PineconeVectorStore
@@ -68,38 +97,49 @@ async def predict(request: PredictRequest):
                 index_name=settings.PINECONE_INDEX_NAME
             )
             
-            # Search in both namespaces
-            # First search dataset
+            # Search dataset namespace (historical labeled data)
+            print("[predict] Searching dataset namespace")
             dataset_results = pinecone_store.search(
-                query_embedding=claim_embedding,
+                query_embedding=claim_embedding.tolist(),
                 top_k=request.top_k,
                 namespace="dataset"
             )
+            print("[predict] Dataset results:", len(dataset_results))
             
-            # Then search live news
+            # Search live_news namespace (recent scraped news)
+            print("[predict] Searching live_news namespace")
             news_results = pinecone_store.search(
-                query_embedding=claim_embedding,
+                query_embedding=claim_embedding.tolist(),
                 top_k=request.top_k,
                 namespace="live_news"
             )
+            print("[predict] Live news results:", len(news_results))
             
             # Combine and sort by score
             all_results = dataset_results + news_results
             all_results.sort(key=lambda x: x['score'], reverse=True)
             
-            # Take top_k
+            # Take top_k results
             evidence = all_results[:request.top_k]
+            print("[predict] Total evidence after combining:", len(evidence))
             
         except Exception as e:
-            print(f"Pinecone search failed: {e}")
-            # Fall back to empty evidence
+            print("[predict] Pinecone search failed:", str(e))
             evidence = []
+    else:
+        print("[predict] Pinecone not configured, skipping search")
     
-    # 4. Reason about the claim
+    # Step 4: Reason about the claim
+    print("[predict] Step 4: Reasoning about claim")
     reasoning = reasoning_agent.reason(claim_text, evidence)
+    print("[predict] Reasoning complete, recommendation:", reasoning.get('verdict_recommendation'))
     
-    # 5. Generate verdict
+    # Step 5: Generate verdict
+    print("[predict] Step 5: Generating verdict")
     verdict = verdict_agent.generate_verdict(claim, reasoning, evidence)
+    print("[predict] Final verdict:", verdict.get('label'))
+    print("[predict] Confidence:", verdict.get('confidence'))
+    print("=" * 50)
     
     return PredictResponse(
         claim=claim,
@@ -111,10 +151,17 @@ async def predict(request: PredictRequest):
 
 @router.get("/predict/stats")
 async def get_pinecone_stats():
-    """Get Pinecone index statistics."""
+    """
+    Get Pinecone index statistics.
+    
+    Returns information about the vector database including
+    total vectors and namespace breakdown.
+    """
+    print("[predict] Stats endpoint called")
     settings = get_settings()
     
     if not settings.PINECONE_API_KEY:
+        print("[predict] PINECONE_API_KEY not set")
         return {"error": "PINECONE_API_KEY not set"}
     
     try:
@@ -125,9 +172,13 @@ async def get_pinecone_stats():
             index_name=settings.PINECONE_INDEX_NAME
         )
         
+        stats = pinecone_store.get_stats()
+        print("[predict] Stats retrieved:", stats)
+        
         return {
             "success": True,
-            "stats": pinecone_store.get_stats()
+            "stats": stats
         }
     except Exception as e:
+        print("[predict] Error getting stats:", str(e))
         return {"error": str(e)}

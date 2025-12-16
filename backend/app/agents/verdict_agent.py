@@ -1,20 +1,25 @@
 """
-Verdict Agent with Map/No-Map Verification Logic.
+verdict_agent.py - Verdict Agent
 
-Uses reasoning output to generate final verdict:
-- HIGH MATCH + TRUE labels → TRUE
-- HIGH MATCH + FALSE labels → FALSE
-- NO MATCH → LIKELY FALSE (unverified)
+This agent takes the reasoning output and generates the final verdict.
+It produces:
+1. Final verdict label (true, false, misleading, needs_verification)
+2. Confidence score (0-1)
+3. Explanation in Sinhala and English
+4. Citations from evidence
 """
 from typing import Dict, List
 
 
 class VerdictAgent:
     """
-    Generates final verdict based on reasoning analysis.
+    Agent for generating final verdicts based on reasoning analysis.
+    
+    This agent takes the output from ReasoningAgent and produces
+    user-friendly verdicts with explanations.
     """
     
-    # Sinhala explanations for each verdict
+    # Sinhala explanations for each verdict type
     EXPLANATIONS_SI = {
         "true": "මෙම පුවත සත්‍ය බව තහවුරු විය. දත්ත ගබඩාවේ ඇති සත්‍ය ලේබල් කළ අන්තර්ගතය සමඟ ගැලපේ.",
         "likely_true": "මෙම පුවත බොහෝ දුරට සත්‍ය විය හැක. සහාය සාක්ෂි හමු විය.",
@@ -23,7 +28,7 @@ class VerdictAgent:
         "false": "මෙම පුවත ව්‍යාජ බව තහවුරු විය. දත්ත ගබඩාවේ ඇති ව්‍යාජ ලේබල් කළ අන්තර්ගතය සමඟ ගැලපේ."
     }
     
-    # English explanations
+    # English explanations for each verdict type
     EXPLANATIONS_EN = {
         "true": "This claim is VERIFIED TRUE. Matches true-labeled content in the database.",
         "likely_true": "This claim is LIKELY TRUE. Supporting evidence was found.",
@@ -33,7 +38,8 @@ class VerdictAgent:
     }
     
     def __init__(self):
-        pass
+        """Initialize the verdict agent."""
+        print("[VerdictAgent] Initialized")
     
     def generate_verdict(self, claim: dict, reasoning: dict, evidence: list) -> dict:
         """
@@ -45,19 +51,30 @@ class VerdictAgent:
             evidence: List of evidence documents
         
         Returns:
-            Verdict with label, confidence, and explanations
+            Dictionary with verdict label, confidence, and explanations
         """
+        print("[VerdictAgent] Generating verdict")
+        
         # Get verdict recommendation from reasoning
         verdict_recommendation = reasoning.get('verdict_recommendation', 'needs_verification')
         match_analysis = reasoning.get('match_analysis', {})
         label_analysis = reasoning.get('label_analysis', {})
         
+        print("[VerdictAgent] Verdict recommendation:", verdict_recommendation)
+        
         # Calculate confidence based on match quality
         confidence = self._calculate_confidence(match_analysis, label_analysis, evidence)
+        print("[VerdictAgent] Confidence score:", confidence)
         
-        # Get explanations
-        explanation_si = self.EXPLANATIONS_SI.get(verdict_recommendation, self.EXPLANATIONS_SI['needs_verification'])
-        explanation_en = self.EXPLANATIONS_EN.get(verdict_recommendation, self.EXPLANATIONS_EN['needs_verification'])
+        # Get explanations in both languages
+        explanation_si = self.EXPLANATIONS_SI.get(
+            verdict_recommendation, 
+            self.EXPLANATIONS_SI['needs_verification']
+        )
+        explanation_en = self.EXPLANATIONS_EN.get(
+            verdict_recommendation, 
+            self.EXPLANATIONS_EN['needs_verification']
+        )
         
         # Build detailed explanation
         detailed_explanation = self._build_detailed_explanation(
@@ -69,6 +86,7 @@ class VerdictAgent:
         
         # Get citations from evidence
         citations = self._extract_citations(evidence)
+        print("[VerdictAgent] Citations count:", len(citations))
         
         return {
             "label": verdict_recommendation,
@@ -82,9 +100,14 @@ class VerdictAgent:
         }
     
     def _calculate_confidence(self, match_analysis: Dict, label_analysis: Dict, evidence: List) -> float:
-        """Calculate confidence score (0-1)."""
+        """
+        Calculate confidence score between 0 and 1.
+        
+        Higher scores mean more confidence in the verdict.
+        """
         if not evidence:
-            return 0.1  # Very low confidence when no evidence
+            print("[VerdictAgent] No evidence - very low confidence")
+            return 0.1
         
         match_level = match_analysis.get('match_level', 'none')
         top_similarity = match_analysis.get('top_similarity', 0)
@@ -103,13 +126,14 @@ class VerdictAgent:
         if labeled_count > 0:
             base_confidence += 0.1
         
-        # Reduce for conflicts
+        # Reduce for conflicting evidence
         if has_conflicts:
             base_confidence -= 0.2
         
         # Factor in top similarity
         confidence = base_confidence * (0.5 + 0.5 * top_similarity)
         
+        # Keep confidence in valid range
         return round(max(0.1, min(0.95, confidence)), 2)
     
     def _build_detailed_explanation(
@@ -119,7 +143,11 @@ class VerdictAgent:
         label_analysis: Dict,
         evidence: List
     ) -> str:
-        """Build detailed explanation of the verdict."""
+        """
+        Build detailed explanation of the verdict.
+        
+        This provides more context than the simple explanation.
+        """
         match_level = match_analysis.get('match_level', 'none')
         top_sim = match_analysis.get('top_similarity', 0)
         
@@ -137,7 +165,7 @@ class VerdictAgent:
                 f"Further fact-checking is recommended."
             )
         
-        else:  # high match
+        else:
             label_counts = label_analysis.get('label_counts', {})
             labeled_count = label_analysis.get('labeled_count', 0)
             
@@ -154,16 +182,22 @@ class VerdictAgent:
                 )
     
     def _extract_citations(self, evidence: List) -> List[str]:
-        """Extract citations from evidence documents."""
+        """
+        Extract citations from evidence documents.
+        
+        Creates readable citation strings from evidence metadata.
+        """
         citations = []
         
-        for doc in evidence[:5]:  # Limit to 5 citations
+        # Limit to 5 citations
+        for doc in evidence[:5]:
             source = doc.get('source', 'Unknown')
             title = doc.get('title', doc.get('text', ''))[:50]
             url = doc.get('url', '')
             label = doc.get('label', '')
             similarity = doc.get('score', 0)
             
+            # Build citation string
             citation = f"{source}: {title}..."
             if label:
                 citation += f" [Label: {label}]"

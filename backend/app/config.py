@@ -1,36 +1,66 @@
 """
-Configuration settings for the application.
+config.py - Application Configuration
+
+This module defines all configuration settings for the application.
+Settings are loaded from environment variables or .env file.
 """
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
+
 class Settings(BaseSettings):
+    """
+    Application settings.
+    
+    All settings can be overridden by environment variables.
+    For example, set OPENROUTER_API_KEY in .env file.
+    """
+    
+    # Application Info
     APP_NAME: str = "Sinhala Agentic Fake News Detection"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/v1"
     
-    # Model Paths
+    # Model Paths (for local FAISS, not used with Pinecone)
     MODEL_PATH: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     EMBEDDINGS_PATH: str = "data/embeddings"
     FAISS_INDEX_PATH: str = "data/embeddings/faiss_index.bin"
     
-    # Database
+    # Database (not used in current implementation)
     DATABASE_URL: str = "sqlite:///./sql_app.db"
     
-    # API Keys
+    # API Keys - Set these in .env file
     HF_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
     PINECONE_API_KEY: str | None = None
     
-    # Pinecone
+    # Pinecone Configuration
     PINECONE_INDEX_NAME: str = "news-store"
     
-    # Embedding Model (OpenRouter compatible)
+    # Embedding Model (via OpenRouter)
+    # Using OpenAI's text-embedding-3-small (1536 dimensions)
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
 
     class Config:
+        """Configuration for settings loading."""
         env_file = ".env"
+        env_file_encoding = "utf-8"
+
 
 @lru_cache()
-def get_settings():
-    return Settings()
+def get_settings() -> Settings:
+    """
+    Get application settings.
+    
+    Uses lru_cache to ensure settings are only loaded once.
+    
+    Returns:
+        Settings instance
+    """
+    print("[config] Loading settings")
+    settings = Settings()
+    print("[config] App name:", settings.APP_NAME)
+    print("[config] Version:", settings.VERSION)
+    print("[config] Pinecone index:", settings.PINECONE_INDEX_NAME)
+    print("[config] Embedding model:", settings.EMBEDDING_MODEL)
+    return settings
