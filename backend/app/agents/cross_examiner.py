@@ -266,30 +266,51 @@ class CrossExaminer:
         zombie_check: Dict,
         similarity_level: str
     ) -> str:
-        """Generate verdict recommendation."""
-        # Check for zombie rumor first
+        """Generate verdict recommendation based on evidence."""
+        # Check for zombie rumor first (known false claim)
         if zombie_check.get("is_zombie"):
             return "false"
         
-        # High similarity with clear labels
-        if similarity_level in ["high", "medium"]:
-            support_score = label_analysis.get("support_score", 0)
-            
-            if support_score >= 0.5:
-                return "true"
-            elif support_score <= -0.5:
-                return "false"
-            elif consensus.get("type") == "conflict":
+        # No labels found - cannot verify
+        if not label_analysis.get("has_labels"):
+            if similarity_level in ["high", "medium"]:
                 return "needs_verification"
-            elif -0.5 < support_score < 0:
-                return "likely_false"
-            elif 0 < support_score < 0.5:
-                return "likely_true"
+            return "unverified"
         
-        # Low or no similarity
-        if similarity_level == "low":
+        support_score = label_analysis.get("support_score", 0)
+        true_count = label_analysis.get("true_count", 0)
+        false_count = label_analysis.get("false_count", 0)
+        
+        # Check for conflicting evidence
+        if consensus.get("type") == "conflict":
             return "needs_verification"
         
+        # HIGH similarity required for definitive verdicts
+        if similarity_level == "high":
+            # Strong evidence for TRUE (score >= 0.7)
+            if support_score >= 0.7 and true_count >= 2:
+                return "true"
+            # Strong evidence for FALSE (score <= -0.7)
+            elif support_score <= -0.7 and false_count >= 2:
+                return "false"
+            # Moderate evidence
+            elif support_score >= 0.4:
+                return "likely_true"
+            elif support_score <= -0.4:
+                return "likely_false"
+            else:
+                return "needs_verification"
+        
+        # MEDIUM similarity - be more cautious
+        elif similarity_level == "medium":
+            if support_score >= 0.6:
+                return "likely_true"
+            elif support_score <= -0.6:
+                return "likely_false"
+            else:
+                return "needs_verification"
+        
+        # LOW or NO similarity - cannot verify
         return "unverified"
     
     def _calculate_confidence(self, label_analysis: Dict, evidence: Dict) -> float:

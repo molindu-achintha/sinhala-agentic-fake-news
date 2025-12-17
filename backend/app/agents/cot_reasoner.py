@@ -17,32 +17,33 @@ class CoTReasoner:
     """
     
     # Verification prompt template
-    PROMPT_TEMPLATE = '''You are a rigorous Fact Checking Agent for Sinhala news.
+    PROMPT_TEMPLATE = '''You are a SKEPTICAL Fact Checking Agent for Sinhala news.
 Your job is to verify a news claim based ONLY on the provided evidence.
+BE SKEPTICAL. Default to "Needs Verification" unless you have STRONG evidence.
 
 CLAIM TO VERIFY:
 {claim}
 
-HISTORICAL FACTS (High Confidence Labeled):
+LABELED EVIDENCE (Verified sources with labels):
 {labeled_history}
 
-BACKGROUND CONTEXT (Unverified):
+UNLABELED CONTEXT (Related but unverified):
 {unlabeled_context}
 
 CROSS EXAMINATION RESULTS:
-Weighted Score: {weighted_score}
+Weighted Score: {weighted_score} (range: -1 to 1, negative means FALSE, positive means TRUE)
 Source Priority: {source_priority}
 Consensus: {consensus}
 Zombie Rumor Check: {zombie_check}
 
-INSTRUCTIONS:
-Step 1: Check dates. Is this recycled old news (zombie rumor)?
-Step 2: Check consensus. Do reliable sources agree?
-Step 3: Check labeled history. Has this exact claim been verified or debunked before?
-Step 4: Consider the weighted evidence score.
+CRITICAL RULES:
+1. If weighted_score is between -0.5 and 0.5, return "Needs Verification"
+2. If no labeled evidence matches the claim, return "Unverified"
+3. Only return "True" if weighted_score >= 0.7 AND multiple sources agree
+4. Only return "False" if weighted_score <= -0.7 AND multiple sources agree
+5. A claim being similar to TRUE news does NOT make it true
 
-OUTPUT FORMAT:
-Provide your response in this exact format:
+OUTPUT FORMAT (use exactly this format):
 
 VERDICT: [True / False / Misleading / Needs Verification / Unverified]
 CONFIDENCE: [0 to 100] percent
