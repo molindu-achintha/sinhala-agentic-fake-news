@@ -122,9 +122,10 @@ class HybridRetriever:
         unlabeled_context.extend(formatted_web)
         
         result = {
-            "labeled_history": labeled_history[:5],
-            "unlabeled_context": unlabeled_context[:5],
+            "labeled_history": labeled_history,  # All labeled results
+            "unlabeled_context": unlabeled_context,  # All web results
             "web_results": web_results,
+            "web_count": len(web_results),
             "top_similarity": top_similarity,
             "similarity_level": self._get_similarity_level(top_similarity),
             "total_evidence": len(filtered_db_results) + len(web_results),

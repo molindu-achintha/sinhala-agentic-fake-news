@@ -104,6 +104,7 @@ class VerdictAgent:
         Calculate confidence score between 0 and 1.
         
         Higher scores mean more confidence in the verdict.
+        Boosts confidence when web search confirms the claim.
         """
         if not evidence:
             print("[VerdictAgent] No evidence - very low confidence")
@@ -113,6 +114,7 @@ class VerdictAgent:
         top_similarity = match_analysis.get('top_similarity', 0)
         labeled_count = label_analysis.get('labeled_count', 0)
         has_conflicts = label_analysis.get('has_conflicts', False)
+        web_count = match_analysis.get('web_count', 0)
         
         # Base confidence from match level
         if match_level == 'high':
@@ -125,6 +127,12 @@ class VerdictAgent:
         # Adjust for labeled evidence
         if labeled_count > 0:
             base_confidence += 0.1
+        
+        # BOOST for web search results
+        if web_count > 0:
+            web_boost = min(0.2, web_count * 0.05)  # Up to +0.2 for web results
+            base_confidence += web_boost
+            print(f"[VerdictAgent] Web search boost: +{web_boost:.2f} ({web_count} results)")
         
         # Reduce for conflicting evidence
         if has_conflicts:
@@ -186,20 +194,25 @@ class VerdictAgent:
         Extract citations from evidence documents.
         
         Creates readable citation strings from evidence metadata.
+        Includes all sources without limit.
         """
         citations = []
         
-        # Limit to 5 citations
-        for doc in evidence[:5]:
+        for doc in evidence:
             source = doc.get('source', 'Unknown')
-            title = doc.get('title', doc.get('text', ''))[:50]
+            title = doc.get('title', doc.get('text', ''))[:80]
             url = doc.get('url', '')
             label = doc.get('label', '')
             similarity = doc.get('score', 0)
+            is_web = 'web' in source.lower() or url.startswith('http')
             
             # Build citation string
-            citation = f"{source}: {title}..."
-            if label:
+            if is_web:
+                citation = f"[Web] {source}: {title}..."
+            else:
+                citation = f"{source}: {title}..."
+            
+            if label and label != 'unverified':
                 citation += f" [Label: {label}]"
             citation += f" (Similarity: {similarity:.0%})"
             if url:
