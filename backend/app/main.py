@@ -33,7 +33,7 @@ app.add_middleware(
 
 # Include API routers
 # Each router handles a group of related endpoints
-app.include_router(health.router, tags=["Health"])
+app.include_router(health.router, prefix="/v1", tags=["Health"])
 app.include_router(predict.router, prefix="/v1", tags=["Prediction"])
 app.include_router(news.router, prefix="/v1", tags=["News"])
 app.include_router(evaluate.router, prefix="/v1", tags=["Evaluation"])

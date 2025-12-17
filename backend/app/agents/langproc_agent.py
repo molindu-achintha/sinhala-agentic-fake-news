@@ -34,7 +34,7 @@ class LangProcAgent:
         
         # Request headers
         self.headers = {
-            "Authorization": "Bearer " + self.api_key,
+            "Authorization": "Bearer " + (self.api_key or ""),
             "Content-Type": "application/json",
             "HTTP-Referer": "http://localhost:8080",
             "X-Title": "Sinhala Fake News Detector"

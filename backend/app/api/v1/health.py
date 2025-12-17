@@ -18,7 +18,7 @@ def health_check():
     # Check Redis
     redis_status = "unknown"
     try:
-        from ..store.memory_store import get_memory_manager
+        from ...store.memory_store import get_memory_manager
         memory = get_memory_manager()
         if memory.short_term.client:
             memory.short_term.client.ping()
@@ -77,7 +77,7 @@ def detailed_health():
     
     # Check memory
     try:
-        from ..store.memory_store import get_memory_manager
+        from ...store.memory_store import get_memory_manager
         memory = get_memory_manager()
         stats = memory.get_stats()
         components["memory"] = {
@@ -91,7 +91,7 @@ def detailed_health():
     
     # Check Pinecone
     try:
-        from ..store.pinecone_store import get_pinecone_store
+        from ...store.pinecone_store import get_pinecone_store
         store = get_pinecone_store()
         components["pinecone"] = {"status": "ok", "message": "Connected"}
     except Exception as e:
