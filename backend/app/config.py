@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # Pinecone Configuration
     PINECONE_INDEX_NAME: str = "news-store"
     
+    # Embedding Configuration
+    # EMBEDDING_PROVIDER options: "openrouter", "pinecone", "local", "auto"
+    # "auto" = try openrouter first, then pinecone, then local
+    EMBEDDING_PROVIDER: str = "auto"
+    
     # Embedding Model (via OpenRouter)
     # Using multilingual-e5-large (1024 dimensions) - supports Sinhala
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"

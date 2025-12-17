@@ -51,11 +51,20 @@ class LangProcAgent:
         # Sentence Transformer model (lazy loaded)
         self._local_model = None
         
-        # Track which provider works
-        self._provider = "openrouter"  # Start with openrouter
+        # Get configured provider (auto, openrouter, pinecone, local)
+        configured_provider = settings.EMBEDDING_PROVIDER.lower()
+        
+        # Set initial provider based on config
+        if configured_provider == "auto":
+            self._provider = "openrouter"  # Auto mode starts with openrouter
+            self._auto_fallback = True
+        else:
+            self._provider = configured_provider
+            self._auto_fallback = False  # Don't fallback if user specified provider
         
         print("[LangProcAgent] Model:", self.model_name)
         print("[LangProcAgent] Dimension:", self.dimension)
+        print("[LangProcAgent] Provider:", self._provider, "(auto-fallback:", self._auto_fallback, ")")
     
     def _get_memory(self):
         """Lazy load memory manager."""
@@ -97,25 +106,25 @@ class LangProcAgent:
                 print("[LangProcAgent] Using cached embedding")
                 return np.array(cached, dtype='float32')
         
-        # Try providers in order
+        # Try providers based on current provider setting
         embedding = None
         
-        # 1. Try OpenRouter (if we haven't failed with it yet)
-        if self._provider == "openrouter" and self.openrouter_key:
-            embedding = self._try_openrouter(text)
-            if embedding is None:
+        # Try the configured/current provider
+        if self._provider == "openrouter":
+            if self.openrouter_key:
+                embedding = self._try_openrouter(text)
+            if embedding is None and self._auto_fallback:
                 print("[LangProcAgent] OpenRouter failed, switching to Pinecone")
                 self._provider = "pinecone"
         
-        # 2. Try Pinecone Inference API
-        if embedding is None and self.pinecone_key:
-            embedding = self._try_pinecone(text)
-            if embedding is None:
+        if self._provider == "pinecone" and embedding is None:
+            if self.pinecone_key:
+                embedding = self._try_pinecone(text)
+            if embedding is None and self._auto_fallback:
                 print("[LangProcAgent] Pinecone failed, switching to local model")
                 self._provider = "local"
         
-        # 3. Try local sentence transformer
-        if embedding is None:
+        if self._provider == "local" and embedding is None:
             embedding = self._try_local(text)
         
         # 4. Last resort: random embedding
