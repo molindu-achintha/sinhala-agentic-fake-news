@@ -6,7 +6,7 @@ Retrieves evidence from Vector DB and separates labeled from unlabeled.
 """
 from typing import Dict, List, Optional
 import numpy as np
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 from ..store.pinecone_store import get_pinecone_store
 from .langproc_agent import LangProcAgent

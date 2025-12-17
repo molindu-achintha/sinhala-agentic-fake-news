@@ -10,6 +10,6 @@ sentence-transformers==2.2.2
 tenacity==8.2.3
 redis==5.0.1
 psycopg2-binary==2.9.9
-duckduckgo-search==4.1.1
+ddgs
 pydantic-settings==2.1.0
 deep-translator==1.11.4
