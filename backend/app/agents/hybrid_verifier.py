@@ -12,6 +12,7 @@ from .cross_examiner import CrossExaminer
 from .cot_reasoner import CoTReasoner
 from .verdict_agent import VerdictAgent
 from .web_analyzer import get_web_analyzer
+from .wikidata_client import get_wikidata_client
 from ..store.memory_store import get_memory_manager
 
 
@@ -37,6 +38,7 @@ class HybridVerifier:
         self.reasoner = CoTReasoner()
         self.verdict_agent = VerdictAgent()
         self.web_analyzer = get_web_analyzer()
+        self.wikidata = get_wikidata_client()
         
         # Initialize memory manager
         self.memory = get_memory_manager()
@@ -69,16 +71,23 @@ class HybridVerifier:
         print("[HybridVerifier] Step 1 Decomposing claim")
         decomposed = self.decomposer.decompose(claim)
         
-        # Step 2: Retrieve evidence
-        print("[HybridVerifier] Step 2 Retrieving evidence")
+        # Step 2: Verify against Wikidata (NEW)
+        print("[HybridVerifier] Step 2 Checking Wikidata")
+        wikidata_result = self.wikidata.verify_claim(
+            claim=claim,
+            translated_claim=decomposed.get("translated_claim", claim)
+        )
+        
+        # Step 3: Retrieve evidence
+        print("[HybridVerifier] Step 3 Retrieving evidence")
         evidence = self.retriever.retrieve(claim, decomposed)
         
-        # Step 3: Cross examine evidence
-        print("[HybridVerifier] Step 3 Cross examining evidence")
+        # Step 4: Cross examine evidence
+        print("[HybridVerifier] Step 4 Cross examining evidence")
         cross_exam = self.examiner.examine(evidence, decomposed)
         
-        # Step 4: Analyze web evidence (NEW)
-        print("[HybridVerifier] Step 4 Analyzing web evidence")
+        # Step 5: Analyze web evidence (NEW)
+        print("[HybridVerifier] Step 5 Analyzing web evidence")
         web_analysis = self.web_analyzer.analyze(
             claim=claim,
             translated_claim=decomposed.get("translated_claim", claim),
@@ -86,11 +95,11 @@ class HybridVerifier:
             web_results=evidence.get("web_results", [])
         )
         
-        # Step 5: Get few shot examples
+        # Step 6: Get few shot examples
         few_shot_examples = self._get_few_shot_examples(evidence)
         
-        # Step 6: Chain of Thought reasoning
-        print("[HybridVerifier] Step 5 Chain of Thought reasoning")
+        # Step 7: Chain of Thought reasoning
+        print("[HybridVerifier] Step 6 Chain of Thought reasoning")
         cot_result = self.reasoner.reason(
             claim, 
             evidence, 
@@ -98,15 +107,16 @@ class HybridVerifier:
             few_shot_examples
         )
         
-        # Step 7: Generate final verdict (with web analysis)
-        print("[HybridVerifier] Step 6 Generating verdict")
+        # Step 8: Generate final verdict (with web & wikidata analysis)
+        print("[HybridVerifier] Step 7 Generating verdict")
         result = self._generate_final_verdict(
             claim, 
             decomposed, 
             evidence, 
             cross_exam, 
             cot_result,
-            web_analysis
+            web_analysis,
+            wikidata_result
         )
         
         # Step 7: Store in memory
@@ -142,27 +152,38 @@ class HybridVerifier:
         evidence: Dict,
         cross_exam: Dict,
         cot_result: Dict,
-        web_analysis: Dict = None
+        web_analysis: Dict = None,
+        wikidata_result: Optional[object] = None
     ) -> Dict:
-        """Generate the final comprehensive verdict with web analysis."""
+        """Generate the final comprehensive verdict with web & wikidata analysis."""
         
         # Use CoT result as primary verdict
         verdict_label = cot_result.get("verdict", "unverified")
         confidence = cot_result.get("confidence", 0.5)
         
-        # APPLY WEB ANALYSIS (NEW)
+        # APPLY WIKIDATA RESULT (Highest Priority)
+        if wikidata_result:
+            print(f"[HybridVerifier] Using Wikidata result: Correct={wikidata_result.is_correct}")
+            if wikidata_result.is_correct:
+                verdict_label = "true"
+                confidence = max(confidence, 0.95)
+            else:
+                verdict_label = "false"
+                confidence = max(confidence, 0.95)
+        
+        # APPLY WEB ANALYSIS (Secondary Priority)
         web_analysis = web_analysis or {}
         confidence_boost = web_analysis.get("confidence_boost", 0)
         verdict_override = web_analysis.get("verdict_override")
         
-        # Apply confidence boost from web evidence
-        if confidence_boost != 0:
+        # Apply confidence boost from web evidence (if no Wikidata override)
+        if not wikidata_result and confidence_boost != 0:
             original_confidence = confidence
             confidence = max(0.1, min(0.95, confidence + confidence_boost))
             print(f"[HybridVerifier] Web boost: {original_confidence:.2f} + {confidence_boost:+.2f} = {confidence:.2f}")
         
-        # Override verdict if web evidence is strong
-        if verdict_override and web_analysis.get("support_count", 0) >= 2:
+        # Override verdict if web evidence is strong (and no Wikidata result)
+        if not wikidata_result and verdict_override and web_analysis.get("support_count", 0) >= 2:
             print(f"[HybridVerifier] Verdict override: {verdict_label} -> {verdict_override}")
             verdict_label = verdict_override
             # Boost confidence for web-confirmed verdicts
@@ -179,7 +200,8 @@ class HybridVerifier:
                 "match_analysis": {
                     "top_similarity": evidence.get("top_similarity", 0),
                     "match_level": evidence.get("similarity_level", "none"),
-                    "web_count": evidence.get("web_count", 0)
+                    "web_count": evidence.get("web_count", 0),
+                    "wikidata_verified": bool(wikidata_result)
                 }
             },
             evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", [])
@@ -191,6 +213,15 @@ class HybridVerifier:
         
         # Format web evidence for citations
         web_citations = []
+        if wikidata_result:
+            web_citations.append({
+                "source": "[Wikidata]",
+                "text": wikidata_result.evidence,
+                "url": wikidata_result.source_url,
+                "stance": "supports" if wikidata_result.is_correct else "refutes",
+                "score": 1.0
+            })
+            
         for we in web_analysis.get("evidence", []):
             source_prefix = "[Wiki] " if we.get("is_wikipedia") else "[Web] "
             stance_emoji = "✓" if we.get("stance") == "supports" else "✗" if we.get("stance") == "refutes" else "?"
