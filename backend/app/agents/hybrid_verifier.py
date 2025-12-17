@@ -11,6 +11,7 @@ from .hybrid_retriever import HybridRetriever
 from .cross_examiner import CrossExaminer
 from .cot_reasoner import CoTReasoner
 from .verdict_agent import VerdictAgent
+from .web_analyzer import get_web_analyzer
 from ..store.memory_store import get_memory_manager
 
 
@@ -35,6 +36,7 @@ class HybridVerifier:
         self.examiner = CrossExaminer()
         self.reasoner = CoTReasoner()
         self.verdict_agent = VerdictAgent()
+        self.web_analyzer = get_web_analyzer()
         
         # Initialize memory manager
         self.memory = get_memory_manager()
@@ -75,11 +77,20 @@ class HybridVerifier:
         print("[HybridVerifier] Step 3 Cross examining evidence")
         cross_exam = self.examiner.examine(evidence, decomposed)
         
-        # Step 4: Get few shot examples
+        # Step 4: Analyze web evidence (NEW)
+        print("[HybridVerifier] Step 4 Analyzing web evidence")
+        web_analysis = self.web_analyzer.analyze(
+            claim=claim,
+            translated_claim=decomposed.get("translated_claim", claim),
+            keywords=decomposed.get("english_keywords", []),
+            web_results=evidence.get("web_results", [])
+        )
+        
+        # Step 5: Get few shot examples
         few_shot_examples = self._get_few_shot_examples(evidence)
         
-        # Step 5: Chain of Thought reasoning
-        print("[HybridVerifier] Step 4 Chain of Thought reasoning")
+        # Step 6: Chain of Thought reasoning
+        print("[HybridVerifier] Step 5 Chain of Thought reasoning")
         cot_result = self.reasoner.reason(
             claim, 
             evidence, 
@@ -87,14 +98,15 @@ class HybridVerifier:
             few_shot_examples
         )
         
-        # Step 6: Generate final verdict
-        print("[HybridVerifier] Step 5 Generating verdict")
+        # Step 7: Generate final verdict (with web analysis)
+        print("[HybridVerifier] Step 6 Generating verdict")
         result = self._generate_final_verdict(
             claim, 
             decomposed, 
             evidence, 
             cross_exam, 
-            cot_result
+            cot_result,
+            web_analysis
         )
         
         # Step 7: Store in memory
@@ -129,13 +141,35 @@ class HybridVerifier:
         decomposed: Dict,
         evidence: Dict,
         cross_exam: Dict,
-        cot_result: Dict
+        cot_result: Dict,
+        web_analysis: Dict = None
     ) -> Dict:
-        """Generate the final comprehensive verdict."""
+        """Generate the final comprehensive verdict with web analysis."""
         
         # Use CoT result as primary verdict
         verdict_label = cot_result.get("verdict", "unverified")
         confidence = cot_result.get("confidence", 0.5)
+        
+        # APPLY WEB ANALYSIS (NEW)
+        web_analysis = web_analysis or {}
+        confidence_boost = web_analysis.get("confidence_boost", 0)
+        verdict_override = web_analysis.get("verdict_override")
+        
+        # Apply confidence boost from web evidence
+        if confidence_boost != 0:
+            original_confidence = confidence
+            confidence = max(0.1, min(0.95, confidence + confidence_boost))
+            print(f"[HybridVerifier] Web boost: {original_confidence:.2f} + {confidence_boost:+.2f} = {confidence:.2f}")
+        
+        # Override verdict if web evidence is strong
+        if verdict_override and web_analysis.get("support_count", 0) >= 2:
+            print(f"[HybridVerifier] Verdict override: {verdict_label} -> {verdict_override}")
+            verdict_label = verdict_override
+            # Boost confidence for web-confirmed verdicts
+            if web_analysis.get("has_wikipedia"):
+                confidence = max(confidence, 0.85)
+            else:
+                confidence = max(confidence, 0.75)
         
         # Generate explanations
         verdict = self.verdict_agent.generate_verdict(
@@ -151,14 +185,28 @@ class HybridVerifier:
             evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", [])
         )
         
-        # Override with CoT results
+        # Override with final results
         verdict["label"] = verdict_label
         verdict["confidence"] = confidence
+        
+        # Format web evidence for citations
+        web_citations = []
+        for we in web_analysis.get("evidence", []):
+            source_prefix = "[Wiki] " if we.get("is_wikipedia") else "[Web] "
+            stance_emoji = "✓" if we.get("stance") == "supports" else "✗" if we.get("stance") == "refutes" else "?"
+            web_citations.append({
+                "source": source_prefix + we.get("source", ""),
+                "text": we.get("content", "")[:150],
+                "url": we.get("url", ""),
+                "stance": we.get("stance", "neutral"),
+                "score": we.get("relevance", 0)
+            })
         
         # Build complete result
         return {
             "claim": {
                 "original": claim,
+                "translated": decomposed.get("translated_claim", ""),
                 "temporal_type": decomposed.get("temporal_type"),
                 "keywords": decomposed.get("keywords", [])[:5]
             },
@@ -168,6 +216,14 @@ class HybridVerifier:
                 "top_similarity": evidence.get("top_similarity", 0),
                 "similarity_level": evidence.get("similarity_level", "none"),
                 "citations": self._format_citations(evidence)
+            },
+            "web_analysis": {
+                "stance": web_analysis.get("overall_stance", "neutral"),
+                "support_count": web_analysis.get("support_count", 0),
+                "refute_count": web_analysis.get("refute_count", 0),
+                "has_wikipedia": web_analysis.get("has_wikipedia", False),
+                "confidence_boost": confidence_boost,
+                "citations": web_citations
             },
             "cross_examination": {
                 "weighted_score": cross_exam.get("weighted_score", 0),
@@ -187,12 +243,16 @@ class HybridVerifier:
                         "result": "Found " + str(evidence.get('labeled_count', 0)) + " labeled " + str(evidence.get('unlabeled_count', 0)) + " unlabeled"
                     },
                     {
+                        "step": "Web Analysis",
+                        "result": f"Stance: {web_analysis.get('overall_stance', 'neutral')}, Support: {web_analysis.get('support_count', 0)}, Refute: {web_analysis.get('refute_count', 0)}"
+                    },
+                    {
                         "step": "Cross Examination",
-                        "result": cross_exam.get("consensus", {}).get("message", "")
+                        "result": cross_exam.get("consensus", {}).get("message", "Analyzed")
                     },
                     {
                         "step": "LLM Reasoning",
-                        "result": cot_result.get("reasoning", "No reasoning provided")
+                        "result": cot_result.get("reasoning", "")[:100]
                     }
                 ]
             },
