@@ -66,3 +66,8 @@ async def startup_event():
 async def shutdown_event():
     """Runs when the application shuts down."""
     print("Shutting down Sinhala Fake News Detection API...")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
