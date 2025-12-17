@@ -144,7 +144,8 @@ class HybridVerifier:
                 "verdict_recommendation": verdict_label,
                 "match_analysis": {
                     "top_similarity": evidence.get("top_similarity", 0),
-                    "match_level": evidence.get("similarity_level", "none")
+                    "match_level": evidence.get("similarity_level", "none"),
+                    "web_count": evidence.get("web_count", 0)
                 }
             },
             evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", [])

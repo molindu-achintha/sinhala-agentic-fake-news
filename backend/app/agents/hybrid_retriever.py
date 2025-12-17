@@ -159,10 +159,17 @@ class HybridRetriever:
     
     def _should_search_web(self, decomposed: Dict, top_similarity: float) -> bool:
         """Determine if web search is needed."""
+        # Always search for recent events
         if decomposed.get("temporal_type") == "recent":
             return True
         
+        # Search if low similarity from DB
         if top_similarity < self.LOW_SIMILARITY:
+            return True
+        
+        # ALWAYS search for general knowledge claims (like capital cities, facts)
+        # This helps verify claims not in our database
+        if decomposed.get("temporal_type") == "general":
             return True
         
         return False
