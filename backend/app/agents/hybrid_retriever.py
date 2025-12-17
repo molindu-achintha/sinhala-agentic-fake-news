@@ -49,9 +49,9 @@ class HybridRetriever:
         # 1. Get embedding
         emb_vector = self.lang_proc.get_embeddings(vector_query)
         
-        # 2. Search Vector DB (Labeled & Unlabeled)
-        labeled_results = self._search_namespace(emb_vector, "labeled_news", top_k=5)
-        unlabeled_results = self._search_namespace(emb_vector, "unlabeled_news", top_k=5)
+        # 2. Search Vector DB (dataset namespace where data is indexed)
+        labeled_results = self._search_namespace(emb_vector, "dataset", top_k=10)
+        unlabeled_results = []  # No separate unlabeled namespace currently
         
         # Combine and Filter Results
         all_db_results = labeled_results + unlabeled_results
@@ -69,8 +69,8 @@ class HybridRetriever:
             
             filtered_db_results.append(doc)
             
-        labeled_history = [d for d in filtered_db_results if d.get("namespace") == "labeled_news"]
-        unlabeled_context = [d for d in filtered_db_results if d.get("namespace") == "unlabeled_news"]
+        labeled_history = filtered_db_results  # All dataset results are labeled
+        unlabeled_context = []
         
         # Calculate text similarity
         top_similarity = 0
