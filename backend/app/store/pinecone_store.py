@@ -193,10 +193,17 @@ class PineconeVectorStore:
 # Singleton
 _store = None
 
+from ..config import get_settings
+
 def get_pinecone_store() -> PineconeVectorStore:
     """Get or create Pinecone store."""
     global _store
     if _store is None:
         print("[PineconeStore] Creating store")
-        _store = PineconeVectorStore()
+        settings = get_settings()
+        _store = PineconeVectorStore(
+            api_key=settings.PINECONE_API_KEY,
+            index_name=settings.PINECONE_INDEX_NAME,
+            dimension=settings.EMBEDDING_DIMENSION
+        )
     return _store
