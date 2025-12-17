@@ -17,4 +17,4 @@ sinling
 beautifulsoup4
 lxml
 aiohttp
-pinecone-client
+pinecone

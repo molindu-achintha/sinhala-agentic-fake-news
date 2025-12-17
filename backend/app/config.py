@@ -38,8 +38,9 @@ class Settings(BaseSettings):
     PINECONE_INDEX_NAME: str = "news-store"
     
     # Embedding Model (via OpenRouter)
-    # Using OpenAI's text-embedding-3-small (1536 dimensions)
-    EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
+    # Using multilingual-e5-large (1024 dimensions) - supports Sinhala
+    EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"
+    EMBEDDING_DIMENSION: int = 1024
 
     class Config:
         """Configuration for settings loading."""

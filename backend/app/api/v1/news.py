@@ -15,7 +15,7 @@ from datetime import datetime
 
 from ...scrapers.news_scraper import get_news_aggregator, NewsArticle
 from ...utils.sinhala_nlp import get_sinhala_nlp
-from ...utils.text_normalize import normalize_text
+from ...utils.text_normalize import normalize_text, preprocess_for_indexing, is_valid_for_indexing
 
 router = APIRouter()
 
@@ -266,20 +266,29 @@ async def index_news_to_pinecone():
     
     for article in articles:
         try:
-            # Generate embedding for article
-            text = f"{article.title}. {article.content}" if article.content else article.title
-            text = normalize_text(text)
+            # Preprocess article text - removes headers, footer, ads
+            raw_text = f"{article.title}. {article.content}" if article.content else article.title
+            text = preprocess_for_indexing(raw_text)
+            
+            # Validate before indexing
+            if not is_valid_for_indexing(text, min_length=30):
+                print("[news] Skipping article - not valid for indexing")
+                continue
+            
+            # Truncate for embedding
+            text = text[:500]
             
             embedding = lang_proc.get_embeddings(text)
             
             # Prepare document for storage
+            # News from trusted sources (Hiru, BBC, etc.) are labeled as true
             doc = {
                 "id": article.id,
                 "text": text[:1000],
-                "title": article.title,
+                "title": normalize_text(article.title)[:200],
                 "source": article.source,
                 "url": article.url,
-                "label": "",
+                "label": "true",  # Trusted news sources
                 "type": "live_news",
                 "scraped_at": article.scraped_at
             }

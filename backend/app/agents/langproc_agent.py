@@ -1,41 +1,34 @@
 """
 langproc_agent.py - Language Processing Agent
 
-This agent handles all language-related tasks:
-1. Text preprocessing (cleaning, normalization)
-2. Embedding generation (converting text to vectors)
-
-It uses OpenRouter API for embedding generation with the
-text-embedding-3-small model (1536 dimensions).
+This agent generates embeddings for text using OpenRouter API.
+Uses multilingual-e5-large model which supports Sinhala (1024 dimensions).
 """
 import requests
 import numpy as np
 from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from ..utils.sin_tokenizer import tokenize
-from ..utils.transliteration import sinhala_to_latin
 from ..config import get_settings
 
 
 class LangProcAgent:
     """
-    Agent for language processing tasks.
-    
-    This agent converts text into embeddings using OpenAI's
-    text-embedding-3-small model via OpenRouter API.
+    Agent for generating text embeddings.
+    Uses OpenRouter API with multilingual-e5-large model.
     """
     
     def __init__(self):
-        """Initialize the language processing agent."""
+        """Set up the agent with API settings."""
         settings = get_settings()
         
-        # OpenRouter API configuration
+        # API settings
         self.api_url = "https://openrouter.ai/api/v1/embeddings"
         self.model_name = settings.EMBEDDING_MODEL
         self.api_key = settings.OPENROUTER_API_KEY
+        self.dimension = settings.EMBEDDING_DIMENSION
         
-        # HTTP headers for API requests
+        # Request headers
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -43,96 +36,43 @@ class LangProcAgent:
             "X-Title": "Sinhala Fake News Detector"
         }
         
-        print("[LangProcAgent] Initialized with model:", self.model_name)
+        print("[LangProcAgent] Model:", self.model_name)
+        print("[LangProcAgent] Dimension:", self.dimension)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def get_embeddings(self, text: str) -> np.ndarray:
         """
-        Get embeddings from OpenRouter API.
-        
-        This method converts text into a 1536-dimensional vector
-        that can be used for similarity search.
-        
-        Args:
-            text: The input text to embed
-            
-        Returns:
-            numpy array with 1536 dimensions
+        Get embedding vector for text.
+        Returns numpy array with 1024 dimensions.
         """
-        print("[LangProcAgent] Generating embedding for text:", text[:50], "...")
+        print("[LangProcAgent] Embedding text:", text[:50], "...")
         
-        # Check if API key is set
+        # Return dummy if no API key
         if not self.api_key:
-            print("[LangProcAgent] Warning: OPENROUTER_API_KEY not set")
-            print("[LangProcAgent] Returning dummy embedding")
-            return np.random.rand(1536).astype('float32')
+            print("[LangProcAgent] No API key, using dummy embedding")
+            return np.random.rand(self.dimension).astype('float32')
         
-        # Prepare API request
-        payload = {
-            "model": self.model_name,
-            "input": text
-        }
-        
-        # Call OpenRouter API
+        # Call API
+        payload = {"model": self.model_name, "input": text}
         response = requests.post(self.api_url, headers=self.headers, json=payload)
         
-        # Check for errors
+        # Check response
         if response.status_code != 200:
-            print("[LangProcAgent] API Error:", response.status_code)
-            raise Exception(f"OpenRouter API Error: {response.status_code} - {response.text}")
+            print("[LangProcAgent] API error:", response.status_code)
+            raise Exception(f"API Error: {response.status_code}")
         
-        # Parse response
+        # Get embedding from response
         result = response.json()
-        
-        # Extract embedding from response
         if "data" in result and len(result["data"]) > 0:
             embedding = result["data"][0]["embedding"]
-            print("[LangProcAgent] Embedding generated, dimension:", len(embedding))
+            print("[LangProcAgent] Got embedding, dim:", len(embedding))
             return np.array(embedding, dtype='float32')
         
-        raise Exception(f"Unexpected API response format: {result}")
+        raise Exception("Bad API response")
 
     def preprocess_text(self, text: str) -> str:
-        """
-        Clean and normalize text.
-        
-        Args:
-            text: Raw input text
-            
-        Returns:
-            Cleaned text
-        """
+        """Clean text before embedding."""
         if not text:
             return ""
-        
-        # Remove extra whitespace
         text = ' '.join(text.split())
-        
-        # Strip leading/trailing whitespace
-        text = text.strip()
-        
-        print("[LangProcAgent] Text preprocessed, length:", len(text))
-        return text
-
-    def process_text(self, text: str) -> dict:
-        """
-        Process text for analysis.
-        
-        This method tokenizes the text and creates a
-        transliteration for debugging purposes.
-        
-        Args:
-            text: Input text in Sinhala
-            
-        Returns:
-            Dictionary with tokens and transliteration
-        """
-        tokens = tokenize(text)
-        translit = sinhala_to_latin(text)
-        
-        print("[LangProcAgent] Text processed, tokens:", len(tokens))
-        
-        return {
-            "tokens": tokens,
-            "transliterated": translit
-        }
+        return text.strip()

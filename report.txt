@@ -826,12 +826,12 @@ is represented by 100-300 numbers.
 
 Sentence embeddings extend this to entire sentences. Reimers and Gurevych 
 (2019) introduced Sentence-BERT, which can create embeddings for entire 
-sentences or paragraphs. These embeddings are typically 768 or 1536 
+sentences or paragraphs. These embeddings are typically 768 or 1024 
 dimensions.
 
-For our project, we use OpenAI's embedding model through OpenRouter, which 
-creates 1536-dimensional vectors. This allows us to compare the similarity 
-of any two pieces of text.
+For our project, we use the multilingual-e5-large embedding model through 
+OpenRouter, which creates 1024-dimensional vectors. This model is designed 
+for multilingual text and supports over 90 languages including Sinhala.
 
 
 2.10 VECTOR DATABASES AND SIMILARITY SEARCH
@@ -1222,7 +1222,7 @@ To understand vector databases, we first need to understand vectors.
 
 A vector is a list of numbers. In our project, every piece of text is 
 converted into a vector. For example, the sentence "The cat sat on the mat" 
-might become [0.1, 0.5, -0.3, 0.8, ...] with 1536 numbers total.
+might become [0.1, 0.5, -0.3, 0.8, ...] with 1024 numbers total.
 
 Similar sentences have similar vectors. The sentences "The cat sat on the 
 mat" and "A kitten was on the carpet" would have vectors that are "close" 
@@ -1301,7 +1301,7 @@ CONCLUSION: Pinecone is the best choice for our project because it balances
 ease of use, performance, and cost.
 
 
-3.4 EMBEDDING MODEL: TEXT-EMBEDDING-3-SMALL (VIA OPENROUTER)
+3.4 EMBEDDING MODEL: MULTILINGUAL-E5-LARGE (VIA OPENROUTER)
 ------------------------------------------------------------
 
 WHAT ARE EMBEDDINGS?
@@ -1311,7 +1311,7 @@ neural network that converts text into vectors.
 
 For example:
 Input: "The economy is growing"
-Output: [0.1, -0.2, 0.5, ...] (1536 numbers)
+Output: [0.1, -0.2, 0.5, ...] (1024 numbers)
 
 The embedding model has "learned" from millions of examples what texts have 
 similar meanings. After training, it can convert any text into a vector 
@@ -1328,52 +1328,48 @@ OpenRouter is particularly useful for projects with limited budgets because:
 - It offers free credits for testing
 - It routes to the cheapest available provider
 
-WHY DID WE CHOOSE TEXT-EMBEDDING-3-SMALL?
+WHY DID WE CHOOSE MULTILINGUAL-E5-LARGE?
 
-This is OpenAI's embedding model, accessible through OpenRouter.
+This is an open-source embedding model from Microsoft/Intfloat, accessible 
+through OpenRouter.
 
-REASON 1 - HIGH QUALITY
+REASON 1 - MULTILINGUAL BY DESIGN
 
-Text-embedding-3-small is one of the best embedding models available. It 
-creates high-quality vectors that accurately capture the meaning of text.
+Multilingual-E5-Large was specifically trained on text from over 90 languages.
+Unlike OpenAI's models which have Sinhala as a small part of training data,
+this model was designed from the ground up for multilingual use. This makes
+it much better for Sinhala text.
 
-REASON 2 - MULTILINGUAL SUPPORT
+REASON 2 - 1024 DIMENSIONS
 
-This model supports many languages, including Sinhala. It was trained on 
-text from around the world, so it can understand Sinhala even though 
-Sinhala was a small part of its training data.
+The model produces 1024-dimensional vectors. This is a good balance between:
+- Quality: Enough dimensions to capture meaning
+- Efficiency: Faster to search than larger dimensions
+- Cost: Pinecone charges based on vector dimensions
 
 REASON 3 - COST EFFECTIVE
 
-Text-embedding-3-small is much cheaper than larger models like 
-text-embedding-3-large. For our project, the smaller model gives good 
-enough quality at a fraction of the cost.
+Through OpenRouter's free tier, we can use this model at $0 cost. This makes
+it perfect for our academic project.
 
-COST COMPARISON:
-- text-embedding-3-small: $0.00002 per 1,000 tokens
-- text-embedding-3-large: $0.00013 per 1,000 tokens
+REASON 4 - SEMANTIC QUALITY
 
-The small model is about 6.5 times cheaper!
-
-REASON 4 - FAST RESPONSE
-
-The model responds quickly. This is important for keeping our system 
-responsive to users.
+E5 models are known for excellent semantic retrieval performance. They 
+understand the meaning of text, not just keywords.
 
 ALTERNATIVES CONSIDERED:
 
+TEXT-EMBEDDING-3-SMALL (OpenAI): Has 1536 dimensions. Good quality but
+requires paid API access after free credits expire.
+
 SENTENCE-TRANSFORMERS: Open-source embedding models that run locally. They 
-are free but require a computer with GPU for good performance. They also 
-may not work as well for Sinhala.
+are free but require a computer with GPU for good performance.
 
 COHERE EMBED: Cohere offers embedding models. They are good quality but 
-slightly more expensive than OpenAI through OpenRouter.
+slightly more expensive than OpenRouter alternatives.
 
-GOOGLE'S EMBEDDING MODELS: Google offers embedding through Vertex AI. 
-However, the setup is more complex.
-
-CONCLUSION: Text-embedding-3-small through OpenRouter gives us the best 
-balance of quality, price, and ease of use.
+CONCLUSION: Multilingual-E5-Large through OpenRouter gives us the best 
+balance of multilingual quality, 1024-dimensional efficiency, and $0 cost.
 
 
 3.5 OTHER LIBRARIES AND TOOLS
@@ -1422,7 +1418,7 @@ COMPONENT          | CHOICE                  | REASON
 Language           | Python 3.10             | Best AI/ML ecosystem
 Web Framework      | FastAPI                 | Fast, async, auto-docs
 Vector Database    | Pinecone                | Managed, scalable, free tier
-Embedding Model    | text-embedding-3-small  | Quality, cost, multilingual
+Embedding Model    | multilingual-e5-large   | Multilingual, 1024-dim, free
 HTTP Client        | aiohttp                 | Async, mature
 HTML Parser        | BeautifulSoup           | Easy to use
 Sinhala NLP        | sinling                 | Only option for Sinhala
@@ -1512,10 +1508,10 @@ of the exact Sinhala form used.
 
 WHY THIS WORKS:
 
-The embedding model (text-embedding-3-small) was trained on massive amounts 
-of text. It learned that different forms of words have related meanings. 
-Even though it saw mostly English, the multilingual training included enough 
-Sinhala for basic understanding.
+The embedding model (multilingual-e5-large) was trained on massive amounts 
+of text from over 90 languages. It learned that different forms of words 
+have related meanings. This model was specifically designed for multilingual
+use, so it has excellent support for Sinhala.
 
 
 4.2 PROBLEM 2: LACK OF TRAINING DATA
@@ -1699,9 +1695,9 @@ PINECONE SERVERLESS:
 Pinecone's serverless tier means we only pay for what we use. For testing 
 and development, the free tier is sufficient.
 
-SMALL EMBEDDING MODEL:
-text-embedding-3-small costs about 6.5x less than the large version but 
-still provides good quality.
+MULTILINGUAL EMBEDDING MODEL:
+multilingual-e5-large is available through OpenRouter's free tier and 
+provides excellent quality for Sinhala text.
 
 NO GPU REQUIRED:
 By using cloud APIs, we don't need to buy or rent expensive GPUs.
@@ -1979,7 +1975,7 @@ SPECIFIC DELIVERABLES:
 
 Deliverable 2.1: Pinecone Index Configuration
 - An index named "news-store" with correct settings
-- Dimension: 1536 (matching OpenAI embedding size)
+- Dimension: 1024 (matching multilingual-e5-large embedding size)
 - Metric: Cosine similarity
 - Two namespaces: "dataset" and "live_news"
 
@@ -2636,22 +2632,27 @@ the relationship between the claim and the evidence to reach a verdict.
 
 DETAILED SPECIFICATIONS:
 - The system shall analyze similarity scores of retrieved evidence
+- The system shall use DUAL THRESHOLDS for different evidence types:
+  - DATASET EVIDENCE: threshold 0.70 (verified labels)
+  - LIVE NEWS EVIDENCE: threshold 0.80 (higher requirement)
 - The system shall categorize match level as:
-  - HIGH MATCH: Similarity > 0.70
-  - MEDIUM MATCH: Similarity 0.50 - 0.70
+  - HIGH MATCH: Above the type-specific threshold
+  - MEDIUM MATCH: Similarity 0.50 to threshold
   - NO MATCH: Similarity < 0.50
+- Dataset evidence shall take priority over live news evidence
+- Live news from trusted sources shall be labeled as "true"
 - For HIGH MATCH cases, the system shall determine if evidence:
   - SUPPORTS the claim → TRUE verdict
   - CONTRADICTS the claim → FALSE verdict
   - PARTIALLY matches → MISLEADING verdict
-- For MEDIUM MATCH cases, the system shall provide tentative verdicts 
-  with lower confidence or return NEEDS VERIFICATION
-- For NO MATCH cases, the system shall return NEEDS VERIFICATION
+- For MEDIUM MATCH cases, the system shall return NEEDS VERIFICATION
+- For NO MATCH cases, the system shall return LIKELY FALSE
 
 ACCEPTANCE CRITERIA:
-1. High-similarity matches produce confident verdicts
-2. Low-similarity searches return NEEDS VERIFICATION
-3. Contradicting evidence produces FALSE verdict
+1. High-similarity dataset matches produce confident verdicts
+2. High-similarity live news matches (above 0.80) produce verdicts
+3. Low-similarity searches return NEEDS VERIFICATION or LIKELY FALSE
+4. Contradicting evidence produces FALSE verdict
 4. Supporting evidence produces TRUE verdict
 5. Mixed evidence produces MISLEADING verdict
 
@@ -3881,8 +3882,8 @@ Examples of Unit Tests:
 
 Test 1: Embedding Generation
 - Input: A sample text string
-- Expected: A vector of 1536 dimensions
-- Verify: Vector length equals 1536
+- Expected: A vector of 1024 dimensions
+- Verify: Vector length equals 1024
 
 Test 2: Similarity Score Calculation
 - Input: Two known vectors
@@ -4311,25 +4312,31 @@ ARCHITECTURE DIAGRAM:
 |             |                                                      |
 |             v                                                      |
 |  +------------------------------------------------------------+   |
-|  |                    AGENT PIPELINE                           |   |
+|  |              TEMPORAL-HYBRID VERIFIER PIPELINE              |   |
 |  |                                                              |   |
-|  |  +------------+    +-------------+    +----------+          |   |
-|  |  | LangProc   |--> | Retrieval   |--> | Reasoning|          |   |
-|  |  | Agent      |    | Agent       |    | Agent    |          |   |
-|  |  +------------+    +-------------+    +----------+          |   |
-|  |                                              |               |   |
-|  |                                              v               |   |
-|  |                                      +----------+            |   |
-|  |                                      | Verdict  |            |   |
-|  |                                      | Agent    |            |   |
-|  |                                      +----------+            |   |
+|  |  +--------------+    +----------------+    +---------------+ |   |
+|  |  | Claim        |--> | Hybrid         |--> | Cross-        | |   |
+|  |  | Decomposer   |    | Retriever      |    | Examiner      | |   |
+|  |  +--------------+    +----------------+    +---------------+ |   |
+|  |        |                    |                    |           |   |
+|  |        v                    v                    v           |   |
+|  |  [Keywords]         [Labeled DB]          [Consensus]        |   |
+|  |  [Dates]            [Unlabeled DB]        [Zombie Check]     |   |
+|  |  [Temporal Type]    [Live News]           [Weighting]        |   |
+|  |                                                              |   |
+|  |                    +---------------+    +---------------+    |   |
+|  |                    | CoT Reasoner  |--> | Verdict Agent |    |   |
+|  |                    | (LLM + Few-   |    |               |    |   |
+|  |                    |  Shot)        |    +---------------+    |   |
+|  |                    +---------------+                         |   |
 |  +------------------------------------------------------------+   |
 +------------------------------------------------------------------+
                               |                      |
                               |                      |
             +----------------+                      +---------------+
             | OpenRouter API |                      | Pinecone DB   |
-            | (Embeddings)   |                      | (Vectors)     |
+            | (Embeddings +  |                      | (Labeled +    |
+            |  LLM)          |                      |  Live News)   |
             +----------------+                      +---------------+
 
 
@@ -4376,12 +4383,46 @@ Different team members could work on different agents simultaneously
 without conflicts.
 
 
-OUR FOUR AGENTS:
+OUR SIX AGENTS (TEMPORAL-HYBRID VERIFIER):
 
-We designed four specialized agents, each with a specific responsibility:
+The Temporal-Hybrid Verifier uses six specialized agents working together:
+
+1. CLAIM DECOMPOSER - Extracts keywords, dates, and determines temporal type
+2. LANGPROC AGENT - Generates embeddings using multilingual-e5-large
+3. HYBRID RETRIEVER - Searches labeled DB and live news with dual thresholds
+4. CROSS-EXAMINER - Weights evidence, checks consensus, detects zombie rumors
+5. COT REASONER - LLM Chain of Thought with few-shot examples
+6. VERDICT AGENT - Generates final verdict with explanations
 
 
-AGENT 1: LANGPROC AGENT (Language Processing Agent)
+AGENT 1: CLAIM DECOMPOSER
+-------------------------
+
+PURPOSE:
+Break down claims into searchable components and determine temporal routing.
+
+RESPONSIBILITIES:
+1. Extract keywords for vector search
+2. Identify date references and temporal type
+3. Determine if claim is historical, recent, or general
+4. Generate optimized queries for DB and web search
+
+TEMPORAL ROUTING LOGIC:
+- Historical claims (before 2024): Prioritize Vector DB
+- Recent claims (today, breaking): Prioritize web search
+- General claims: Search both sources
+
+CLASS DESIGN:
+
+class ClaimDecomposer:
+    RECENT_KEYWORDS = ["today", "breaking", "now", "just"]
+    PAST_KEYWORDS = ["2019", "2020", "2021", "2022", "2023"]
+    
+    def decompose(self, claim: str) -> Dict:
+        # Returns: keywords, dates, temporal_type, vector_query
+
+
+AGENT 2: LANGPROC AGENT (Language Processing Agent)
 ---------------------------------------------------
 
 PURPOSE:
@@ -4405,7 +4446,7 @@ class LangProcAgent:
     
     Methods:
         generate_embedding(text: str) -> List[float]
-            Convert text to 1536-dimensional vector
+            Convert text to 1024-dimensional vector
         
         preprocess_text(text: str) -> str
             Clean and normalize input text
@@ -4417,10 +4458,10 @@ DESIGN DECISIONS:
    - Better cost management and tracking
    - Single API key for multiple providers
 
-2. We use text-embedding-3-small model because:
-   - Good balance of quality and cost
-   - Supports multiple languages including Sinhala
-   - 1536 dimensions is standard and works well
+2. We use multilingual-e5-large model because:
+   - Designed specifically for multilingual text
+   - Supports Sinhala and 90+ other languages
+   - 1024 dimensions is efficient and works well
 
 3. We preprocess text to:
    - Remove extra whitespace
@@ -4428,44 +4469,38 @@ DESIGN DECISIONS:
    - Normalize Unicode (important for Sinhala)
 
 
-AGENT 2: RETRIEVAL AGENT
-------------------------
+AGENT 3: HYBRID RETRIEVER
+-------------------------
 
 PURPOSE:
-Find relevant evidence from the vector database for a given claim.
+Search both labeled database and live news with appropriate thresholds.
+Separate evidence into labeled (verified) and unlabeled (context).
 
 RESPONSIBILITIES:
-1. Connect to Pinecone vector database
-2. Search for similar documents using query vector
-3. Search across multiple namespaces
-4. Return results with similarity scores and metadata
+1. Generate embedding for claim
+2. Search "dataset" namespace (labeled historical data)
+3. Search "live_news" namespace (scraped trusted sources)
+4. Separate results into labeled and unlabeled evidence
+5. Determine if web search is needed
+
+DUAL THRESHOLD LOGIC:
+- Dataset evidence: threshold 0.70 (verified labels)
+- Live news evidence: threshold 0.80 (stricter, auto-labeled)
 
 CLASS DESIGN:
 
-class RetrievalAgent:
-    """Agent responsible for retrieving evidence from vector database."""
+class HybridRetriever:
+    HIGH_SIMILARITY = 0.90   # Direct verdict possible
+    MEDIUM_SIMILARITY = 0.70  # Need cross-reference
+    LOW_SIMILARITY = 0.50     # Weak match
     
-    Attributes:
-        vector_store: PineconeVectorStore  - Database connection
-    
-    Methods:
-        search(query_vector, top_k=5, namespace="dataset") -> List[Match]
-            Search single namespace for similar documents
-        
-        search_both_namespaces(query_vector, top_k=5) -> List[Match]
-            Search both dataset and live_news namespaces
+    def retrieve(self, claim: str, decomposed: Dict) -> Dict:
+        # Returns: labeled_history, unlabeled_context, web_results
 
-DESIGN DECISIONS:
-
-1. We search both namespaces because:
-   - Claims might relate to historical events (dataset)
-   - Claims might relate to current events (live_news)
-   - Combining gives better coverage
-
-2. We return top 5 results because:
-   - Too few (like 1) might miss relevant evidence
-   - Too many (like 20) adds noise and slows processing
-   - 5 is a good balance found empirically
+EVIDENCE CATEGORIZATION:
+- Labeled History: Documents with true/false/misleading labels
+- Unlabeled Context: Documents without verified labels
+- Web Results: Live internet search (if needed)
 
 3. We include metadata in results because:
    - Source helps with credibility assessment
@@ -4493,62 +4528,119 @@ class ReasoningAgent:
     """Agent responsible for analyzing evidence and forming judgment."""
     
     Attributes:
-        high_threshold: float  - Threshold for high confidence (0.70)
-        medium_threshold: float - Threshold for medium confidence (0.50)
+        HIGH_THRESHOLD_DATASET: float   - Threshold for dataset (0.70)
+        HIGH_THRESHOLD_LIVE_NEWS: float - Threshold for live news (0.80)
+        MEDIUM_THRESHOLD: float         - Threshold for medium match (0.50)
     
     Methods:
         reason(claim: str, evidence: List[Match]) -> ReasoningResult
             Analyze claim against evidence and form judgment
         
-        analyze_similarity(evidence: List[Match]) -> MatchLevel
-            Categorize overall similarity level
+        _analyze_matches(evidence: List[Match], threshold: float) -> MatchLevel
+            Categorize similarity level using specific threshold
         
-        analyze_labels(evidence: List[Match]) -> LabelAnalysis
-            Check if evidence has labels and what they indicate
+        _combine_analysis(dataset_analysis, live_news_analysis) -> CombinedResult
+            Combine results with priority to dataset
 
-THE MAP/NO-MAP LOGIC:
+THE DUAL-THRESHOLD VERIFICATION SYSTEM:
 
-This is the core decision-making algorithm of our system.
+This is the core decision-making algorithm. We use different thresholds for
+different types of evidence because they have different reliability levels.
 
-STEP 1: Calculate average similarity score from top matches
+THRESHOLD DESIGN:
 
-STEP 2: Determine match level based on thresholds:
-
-  HIGH MATCH (similarity > 0.70):
-  - Evidence strongly matches the claim semantically
-  - We have high confidence in our ability to verify
-  - Proceed to check if evidence supports or contradicts
+  DATASET EVIDENCE (threshold = 0.70):
+  - Contains pre-verified labeled data
+  - Labels have been validated (true/false/misleading)
+  - Lower threshold because labels are reliable
   
-  MEDIUM MATCH (similarity 0.50 - 0.70):
-  - Evidence somewhat related but not strongly confident
-  - Lower confidence in verification
-  - Still attempt verdict but with caveats
-  
-  NO MATCH (similarity < 0.50):
-  - No semantically similar evidence found
-  - Cannot verify the claim
-  - Return "needs_verification" verdict
+  LIVE NEWS EVIDENCE (threshold = 0.80):
+  - Scraped from trusted sources (Hiru, BBC, Ada Derana)
+  - Automatically labeled as "true" (trusted sources)
+  - Higher threshold to require stronger match
+  - Prevents false positives from tangentially related news
 
-STEP 3: For matches, analyze the relationship:
-  - Do evidence and claim agree? → TRUE verdict
-  - Do evidence and claim contradict? → FALSE verdict
-  - Is there a mix? → MISLEADING verdict
+TRUSTED NEWS SOURCES:
 
-STEP 4: Check evidence labels (if from labeled dataset):
-  - If evidence labeled "true" and high similarity → TRUE
-  - If evidence labeled "false" and high similarity → FALSE
+The system recognizes these sources as trusted:
+- BBC Sinhala
+- Hiru News
+- Ada Derana
+- Lankadeepa
+- ITN News
+
+News scraped from these sources is labeled "true" because they are
+established news outlets with editorial standards.
+
+STEP-BY-STEP VERIFICATION PROCESS:
+
+STEP 1: Separate evidence by type
+  - Identify which documents came from "dataset" namespace
+  - Identify which documents came from "live_news" namespace
+
+STEP 2: Apply appropriate thresholds
+  - Dataset evidence: Use 0.70 threshold
+  - Live news evidence: Use 0.80 threshold (stricter)
+
+STEP 3: Analyze each type separately
+  - For each type, determine if there's a HIGH, MEDIUM, or NO match
+  - HIGH: Above threshold
+  - MEDIUM: Between 0.50 and threshold
+  - NONE: Below 0.50
+
+STEP 4: Combine analysis with priority
+  - Priority 1: Dataset HIGH match (verified labels)
+  - Priority 2: Live news HIGH match (trusted sources)
+  - Priority 3: Any MEDIUM match
+  - Default: NO match
+
+STEP 5: Determine verdict based on labels
+  - If HIGH match with "true" labels → TRUE verdict
+  - If HIGH match with "false" labels → FALSE verdict
+  - If HIGH match with mixed labels → NEEDS_VERIFICATION
+  - If MEDIUM match → NEEDS_VERIFICATION
+  - If NO match → LIKELY_FALSE
+
+EXAMPLE:
+
+Claim: "ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි"
+
+Step 1 - Separate:
+  Dataset: [Doc1 (0.85), Doc2 (0.72)]
+  Live News: [Doc3 (0.88), Doc4 (0.75)]
+
+Step 2 - Apply thresholds:
+  Dataset (threshold 0.70): Doc1 HIGH, Doc2 HIGH
+  Live News (threshold 0.80): Doc3 HIGH, Doc4 MEDIUM
+
+Step 3 - Combine (dataset priority):
+  Primary source: Dataset
+  Match level: HIGH
+  Top similarity: 85%
+
+Step 4 - Check labels:
+  Doc1: label="true", Doc2: label="true"
+  Support score: +0.78
+
+Step 5 - Verdict:
+  Result: TRUE (high support score)
 
 DESIGN DECISIONS:
 
-1. We use 0.70 as high threshold because:
+1. We use 0.70 for dataset because:
+   - Dataset labels are pre-verified
+   - Lower threshold is acceptable with reliable labels
    - Empirically found to indicate good semantic match
-   - Higher thresholds miss valid matches
-   - Lower thresholds include irrelevant results
 
-2. We prefer "needs_verification" over guessing because:
-   - Better to admit uncertainty than give wrong answer
-   - Users can then seek other sources
-   - Maintains system credibility
+2. We use 0.80 for live news because:
+   - Live news has automatic "true" labels
+   - Higher threshold prevents false positives
+   - Requires stronger semantic match for trusted content
+
+3. Dataset takes priority over live news because:
+   - Dataset has human-verified labels
+   - Live news labels are automatic
+   - Dataset may have specific fact-check results
 
 
 AGENT 4: VERDICT AGENT
@@ -4665,7 +4757,7 @@ STEP 4: LANGPROC AGENT PROCESSING
 The LangProc agent receives the claim text:
 - Preprocesses the text (clean, normalize)
 - Calls OpenRouter API for embedding
-- Receives 1536-dimensional vector
+- Receives 1024-dimensional vector
 - Returns embedding: [0.123, -0.456, 0.789, ...]
 
 Time taken: ~500ms
@@ -4765,9 +4857,9 @@ INDEX CONFIGURATION:
 
 INDEX NAME: news-store
 
-DIMENSION: 1536
-- This matches the output size of text-embedding-3-small
-- All vectors must have exactly 1536 numbers
+DIMENSION: 1024
+- This matches the output size of multilingual-e5-large
+- All vectors must have exactly 1024 numbers
 - Changing embedding model may require new index
 
 METRIC: cosine
@@ -5493,7 +5585,7 @@ class LangProcAgent:
         }
         
         data = {
-            "model": "openai/text-embedding-3-small",
+            "model": "intfloat/multilingual-e5-large",
             "input": text
         }
         
@@ -5518,49 +5610,65 @@ class LangProcAgent:
 9.5 REASONING AGENT
 -------------------
 
-The ReasoningAgent implements the core verification logic:
+The ReasoningAgent implements dual-threshold verification logic:
 
 class ReasoningAgent:
-    # Thresholds for matching
-    HIGH_SIMILARITY_THRESHOLD = 0.70
-    MEDIUM_SIMILARITY_THRESHOLD = 0.50
+    # Different thresholds for different evidence types
+    HIGH_THRESHOLD_DATASET = 0.70     # For verified labeled data
+    HIGH_THRESHOLD_LIVE_NEWS = 0.80   # Higher for scraped news
+    MEDIUM_THRESHOLD = 0.50
+    
+    # Trusted news sources (labeled as "true")
+    TRUSTED_SOURCES = ["BBC Sinhala", "Hiru News", "Ada Derana", 
+                       "Lankadeepa", "ITN News"]
     
     def reason(self, claim, evidence):
-        """Analyze evidence and determine verdict."""
+        """Analyze evidence with dual thresholds."""
         if not evidence:
             return self._no_evidence_result()
         
-        # Analyze match levels
-        match_analysis = self._analyze_matches(evidence)
+        # Step 1: Separate evidence by type
+        dataset_evidence = [e for e in evidence if e.get('type') == 'dataset']
+        live_news_evidence = [e for e in evidence if e.get('type') == 'live_news']
+        
+        # Step 2: Analyze with appropriate thresholds
+        dataset_analysis = self._analyze_matches(
+            dataset_evidence, self.HIGH_THRESHOLD_DATASET)
+        live_news_analysis = self._analyze_matches(
+            live_news_evidence, self.HIGH_THRESHOLD_LIVE_NEWS)
+        
+        # Step 3: Combine with dataset priority
+        match_analysis = self._combine_analysis(dataset_analysis, live_news_analysis)
         match_level = match_analysis['match_level']
         
+        # Step 4: Determine verdict
         if match_level == 'high':
-            # Strong evidence found - check labels
             label_analysis = self._analyze_labels(evidence)
             verdict = self._determine_verdict(label_analysis)
         elif match_level == 'medium':
-            # Some evidence - tentative judgment
             verdict = "needs_verification"
         else:
-            # No good matches
-            verdict = "needs_verification"
+            verdict = "likely_false"
         
         return {
             "summary": self._generate_summary(match_analysis),
             "match_level": match_level,
             "verdict_recommendation": verdict,
-            "confidence": match_analysis['confidence']
+            "dataset_matches": len(dataset_evidence),
+            "live_news_matches": len(live_news_evidence)
         }
     
-    def _analyze_matches(self, evidence):
-        """Analyze similarity scores of evidence."""
-        scores = [doc.get('score', 0) for doc in evidence]
-        top_score = max(scores) if scores else 0
-        avg_score = sum(scores) / len(scores) if scores else 0
+    def _analyze_matches(self, evidence, threshold):
+        """Analyze matches using the specified threshold."""
+        if not evidence:
+            return {"match_level": "none", "top_similarity": 0}
         
-        if top_score >= self.HIGH_SIMILARITY_THRESHOLD:
+        scores = [doc.get('score', 0) for doc in evidence]
+        top_score = max(scores)
+        
+        if top_score >= threshold:
             match_level = "high"
-        elif top_score >= self.MEDIUM_SIMILARITY_THRESHOLD:
+        elif top_score >= self.MEDIUM_THRESHOLD:
             match_level = "medium"
         else:
             match_level = "none"
@@ -5568,9 +5676,24 @@ class ReasoningAgent:
         return {
             "match_level": match_level,
             "top_similarity": top_score,
-            "avg_similarity": avg_score,
-            "confidence": top_score
+            "threshold_used": threshold
         }
+    
+    def _combine_analysis(self, dataset_analysis, live_news_analysis):
+        """Combine results with dataset taking priority."""
+        # Dataset takes priority
+        if dataset_analysis['match_level'] == 'high':
+            return {**dataset_analysis, "primary_source": "dataset"}
+        
+        if live_news_analysis['match_level'] == 'high':
+            return {**live_news_analysis, "primary_source": "live_news"}
+        
+        # Return medium if any
+        if dataset_analysis['match_level'] == 'medium' or \
+           live_news_analysis['match_level'] == 'medium':
+            return {"match_level": "medium", "primary_source": "combined"}
+        
+        return {"match_level": "none", "primary_source": "none"}
 
 
 9.6 NEWS SCRAPERS
@@ -7533,7 +7656,7 @@ STEP 5: CREATE PINECONE INDEX
 
 Before first use, create an index in Pinecone:
 - Name: news-store
-- Dimension: 1536
+- Dimension: 1024
 - Metric: cosine
 
 
@@ -8061,14 +8184,14 @@ class LangProcAgent:
     """
     Agent for language processing tasks.
     
-    This agent converts text into embeddings using OpenAI's
-    text-embedding-3-small model via OpenRouter API.
+    This agent converts text into embeddings using
+    multilingual-e5-large model via OpenRouter API.
     """
     
     # OpenRouter API configuration
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-    EMBEDDING_MODEL = "openai/text-embedding-3-small"
-    EMBEDDING_DIMENSION = 1536
+    EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
+    EMBEDDING_DIMENSION = 1024
     
     def __init__(self):
         """
@@ -8137,14 +8260,14 @@ class LangProcAgent:
         """
         Convert text to embedding vector.
         
-        Sends text to OpenRouter API and receives a 1536-dimensional
+        Sends text to OpenRouter API and receives a 1024-dimensional
         vector representation that can be used for similarity search.
         
         Args:
             text: The text to embed (will be preprocessed)
             
         Returns:
-            List[float]: 1536-dimensional embedding vector
+            List[float]: 1024-dimensional embedding vector
             
         Raises:
             Exception: If API call fails
@@ -8220,13 +8343,13 @@ F.4 REASONING AGENT (app/agents/reasoning_agent.py)
 """
 reasoning_agent.py - Reasoning Agent
 
-This agent analyzes retrieved evidence and determines:
-1. Match level (high, medium, low, none)
-2. Evidence labels (true, false, misleading)
-3. Initial verdict recommendation
-4. Confidence score
+This agent analyzes retrieved evidence using dual thresholds:
+1. Dataset evidence: 0.70 threshold (verified labels)
+2. Live news evidence: 0.80 threshold (trusted sources)
 
-It implements the Map/No-Map logic described in the design.
+It implements priority-based verification:
+- Dataset matches take priority over live news
+- Live news from trusted sources labeled as "true"
 """
 
 import logging
@@ -8237,20 +8360,24 @@ logger = logging.getLogger(__name__)
 
 class ReasoningAgent:
     """
-    Agent for analyzing evidence and generating reasoning.
+    Agent for analyzing evidence with dual-threshold system.
     """
     
-    # Similarity thresholds
-    HIGH_SIMILARITY_THRESHOLD = 0.70
-    MEDIUM_SIMILARITY_THRESHOLD = 0.50
-    LOW_SIMILARITY_THRESHOLD = 0.30
+    # Different thresholds for different evidence types
+    HIGH_THRESHOLD_DATASET = 0.70     # For verified labeled data
+    HIGH_THRESHOLD_LIVE_NEWS = 0.80   # Higher threshold for scraped news
+    MEDIUM_THRESHOLD = 0.50
+    
+    # Trusted news sources
+    TRUSTED_SOURCES = ["BBC Sinhala", "Hiru News", "Ada Derana",
+                       "Lankadeepa", "ITN News"]
     
     # Minimum evidence required for confident verdict
     MIN_EVIDENCE_FOR_VERDICT = 2
     
     def __init__(self):
         """Initialize the reasoning agent."""
-        logger.info("ReasoningAgent initialized")
+        logger.info("ReasoningAgent initialized with dual thresholds")
     
     
     def analyze_evidence(

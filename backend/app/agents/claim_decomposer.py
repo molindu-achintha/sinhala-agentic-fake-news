@@ -1,0 +1,135 @@
+"""
+claim_decomposer.py - Claim Decomposition Agent
+
+Breaks down claims into atomic facts, extracts:
+- Keywords for vector search
+- Dates (for temporal routing)
+- Entities (people, organizations)
+- Claim type (event, statement, statistic)
+"""
+import re
+from datetime import datetime
+from typing import Dict, List
+
+
+class ClaimDecomposer:
+    """
+    Decomposes claims into searchable components.
+    """
+    
+    # Keywords indicating recent events
+    RECENT_KEYWORDS = [
+        "today", "yesterday", "breaking", "just now", "now",
+        "අද", "ඊයේ", "දැන්", "මේ මොහොතේ", "නවතම"
+    ]
+    
+    # Keywords indicating past events
+    PAST_KEYWORDS = [
+        "in 2019", "in 2020", "in 2021", "in 2022", "in 2023",
+        "2019", "2020", "2021", "2022", "2023"
+    ]
+    
+    def __init__(self):
+        """Initialize decomposer."""
+        print("[ClaimDecomposer] Initialized")
+    
+    def decompose(self, claim: str) -> Dict:
+        """
+        Decompose a claim into searchable components.
+        
+        Args:
+            claim: The raw claim text
+        
+        Returns:
+            Dict with keywords, dates, entities, temporal_type
+        """
+        print("[ClaimDecomposer] Decomposing claim")
+        
+        # Extract year references
+        years = self._extract_years(claim)
+        
+        # Determine temporal type
+        temporal_type = self._get_temporal_type(claim, years)
+        
+        # Extract keywords for search
+        keywords = self._extract_keywords(claim)
+        
+        # Generate search queries
+        vector_query = self._create_vector_query(claim, keywords)
+        web_query = self._create_web_query(claim, keywords)
+        
+        result = {
+            "original_claim": claim,
+            "keywords": keywords,
+            "years": years,
+            "temporal_type": temporal_type,  # "recent", "historical", "general"
+            "vector_query": vector_query,
+            "web_query": web_query,
+            "needs_web_search": temporal_type == "recent"
+        }
+        
+        print(f"[ClaimDecomposer] Temporal type: {temporal_type}")
+        print(f"[ClaimDecomposer] Keywords: {keywords[:5]}...")
+        
+        return result
+    
+    def _extract_years(self, text: str) -> List[int]:
+        """Extract year references from text."""
+        years = re.findall(r'\b(20[1-2][0-9])\b', text)
+        return [int(y) for y in years]
+    
+    def _get_temporal_type(self, claim: str, years: List[int]) -> str:
+        """
+        Determine if claim is about recent or historical events.
+        
+        Returns:
+            "recent" - needs web search
+            "historical" - trust vector DB
+            "general" - search both
+        """
+        claim_lower = claim.lower()
+        
+        # Check for recent keywords
+        for keyword in self.RECENT_KEYWORDS:
+            if keyword.lower() in claim_lower:
+                return "recent"
+        
+        # Check year references
+        current_year = datetime.now().year
+        if years:
+            max_year = max(years)
+            if max_year >= current_year:
+                return "recent"
+            elif max_year <= 2023:
+                return "historical"
+        
+        # Default to general
+        return "general"
+    
+    def _extract_keywords(self, claim: str) -> List[str]:
+        """Extract important keywords from claim."""
+        # Remove common stop words
+        stop_words = {
+            "the", "a", "an", "is", "are", "was", "were", "has", "have",
+            "will", "be", "been", "being", "that", "this", "it", "and",
+            "or", "but", "if", "then", "so", "because", "as", "of", "in",
+            "on", "at", "to", "for", "with", "by", "from", "about"
+        }
+        
+        # Split and clean
+        words = re.findall(r'\b\w+\b', claim)
+        keywords = [w for w in words if w.lower() not in stop_words and len(w) > 2]
+        
+        return keywords
+    
+    def _create_vector_query(self, claim: str, keywords: List[str]) -> str:
+        """Create optimized query for vector search."""
+        # Use full claim for semantic search
+        return claim
+    
+    def _create_web_query(self, claim: str, keywords: List[str]) -> str:
+        """Create query for web search."""
+        # Use keywords + date for web search
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        keyword_str = " ".join(keywords[:5])
+        return f"verify {keyword_str} {date_str}"

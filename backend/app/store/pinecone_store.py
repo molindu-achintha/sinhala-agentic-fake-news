@@ -1,17 +1,9 @@
 """
-pinecone_store.py - Pinecone Vector Database Interface
+pinecone_store.py - Pinecone Vector Database
 
-This module provides the interface to Pinecone cloud vector database.
-It handles:
-1. Index initialization and connection
-2. Document upserting (adding/updating)
-3. Semantic similarity search
-4. Namespace management (dataset and live_news)
-
-The index uses cosine similarity with 1536-dimensional vectors
-from text-embedding-3-small model.
+Stores and searches news articles using vector embeddings.
+Uses 1024 dimensions (multilingual-e5-large model).
 """
-
 from pinecone import Pinecone, ServerlessSpec
 from typing import List, Dict, Optional
 import os
@@ -21,29 +13,25 @@ import hashlib
 
 class PineconeVectorStore:
     """
-    Pinecone vector store for semantic search.
-    
-    This class manages all interactions with Pinecone:
-    - Creating and connecting to indexes
-    - Adding documents with embeddings
-    - Searching for similar documents
+    Vector store using Pinecone cloud database.
+    Handles adding and searching documents.
     """
     
     def __init__(
         self, 
         api_key: str = None,
         index_name: str = "news-store",
-        dimension: int = 1536,
+        dimension: int = 1024,
         metric: str = "cosine"
     ):
         """
-        Initialize the Pinecone vector store.
+        Set up connection to Pinecone.
         
         Args:
-            api_key: Pinecone API key (from .env if not provided)
-            index_name: Name of the Pinecone index
-            dimension: Embedding dimension (1536 for text-embedding-3-small)
-            metric: Similarity metric (cosine, euclidean, or dotproduct)
+            api_key: Pinecone API key
+            index_name: Name of the index
+            dimension: Vector dimension (1024)
+            metric: Similarity metric
         """
         self.api_key = api_key or os.getenv("PINECONE_API_KEY")
         self.index_name = index_name
@@ -52,49 +40,39 @@ class PineconeVectorStore:
         self.pc = None
         self.index = None
         
-        print("[PineconeStore] Initializing with index:", index_name)
+        print("[PineconeStore] Index:", index_name)
+        print("[PineconeStore] Dimension:", dimension)
         
         if not self.api_key:
-            raise ValueError("PINECONE_API_KEY not set. Please add it to your .env file.")
+            raise ValueError("PINECONE_API_KEY not set")
         
-        self._initialize()
+        self._connect()
     
-    def _initialize(self):
-        """Initialize Pinecone client and create index if needed."""
-        print("[PineconeStore] Connecting to Pinecone")
+    def _connect(self):
+        """Connect to Pinecone and create index if needed."""
+        print("[PineconeStore] Connecting...")
         self.pc = Pinecone(api_key=self.api_key)
         
-        # Check if index exists
-        existing_indexes = [idx.name for idx in self.pc.list_indexes()]
-        print("[PineconeStore] Existing indexes:", existing_indexes)
+        # Check existing indexes
+        existing = [idx.name for idx in self.pc.list_indexes()]
+        print("[PineconeStore] Existing indexes:", existing)
         
-        if self.index_name not in existing_indexes:
-            print("[PineconeStore] Creating new index:", self.index_name)
+        # Create index if not exists
+        if self.index_name not in existing:
+            print("[PineconeStore] Creating index...")
             self.pc.create_index(
                 name=self.index_name,
                 dimension=self.dimension,
                 metric=self.metric,
-                spec=ServerlessSpec(
-                    cloud="aws",
-                    region="us-east-1"
-                )
+                spec=ServerlessSpec(cloud="aws", region="us-east-1")
             )
-            print("[PineconeStore] Index created successfully")
+            print("[PineconeStore] Index created")
         
         self.index = self.pc.Index(self.index_name)
-        print("[PineconeStore] Connected to index:", self.index_name)
+        print("[PineconeStore] Connected")
     
     def generate_id(self, text: str, source: str = "") -> str:
-        """
-        Generate unique ID from text content.
-        
-        Args:
-            text: Document text
-            source: Document source
-            
-        Returns:
-            16-character hash ID
-        """
+        """Create unique ID from text."""
         content = f"{source}:{text}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
     
@@ -105,27 +83,27 @@ class PineconeVectorStore:
         namespace: str = "default"
     ) -> int:
         """
-        Add or update documents in Pinecone.
+        Add documents to Pinecone.
         
         Args:
-            documents: List of dicts with text, source, label, etc.
-            embeddings: List of embedding vectors (1536-dim each)
-            namespace: Namespace to store in (dataset or live_news)
+            documents: List of document dicts
+            embeddings: List of embedding vectors
+            namespace: Namespace (dataset or live_news)
         
         Returns:
-            Number of documents upserted
+            Number of documents added
         """
-        print("[PineconeStore] Upserting", len(documents), "documents to namespace:", namespace)
+        print("[PineconeStore] Upserting", len(documents), "docs to", namespace)
         
         if len(documents) != len(embeddings):
-            raise ValueError("Number of documents must match number of embeddings")
+            raise ValueError("Documents and embeddings must match")
         
-        # Prepare vectors for upsert
+        # Build vectors
         vectors = []
-        for doc, embedding in zip(documents, embeddings):
+        for doc, emb in zip(documents, embeddings):
             doc_id = doc.get('id') or self.generate_id(doc.get('text', ''), doc.get('source', ''))
             
-            # Metadata (Pinecone supports up to 40KB per vector)
+            # Metadata
             metadata = {
                 "text": doc.get('text', '')[:1000],
                 "title": doc.get('title', '')[:500],
@@ -138,21 +116,21 @@ class PineconeVectorStore:
             
             vectors.append({
                 "id": doc_id,
-                "values": embedding,
+                "values": emb,
                 "metadata": metadata
             })
         
-        # Upsert in batches of 100
+        # Upsert in batches
         batch_size = 100
-        upserted = 0
+        total = 0
         
         for i in range(0, len(vectors), batch_size):
             batch = vectors[i:i + batch_size]
             self.index.upsert(vectors=batch, namespace=namespace)
-            upserted += len(batch)
-            print("[PineconeStore] Upserted", upserted, "/", len(vectors), "vectors")
+            total += len(batch)
+            print("[PineconeStore] Upserted", total, "/", len(vectors))
         
-        return upserted
+        return total
     
     def search(
         self, 
@@ -165,15 +143,14 @@ class PineconeVectorStore:
         Search for similar documents.
         
         Args:
-            query_embedding: Query vector (1536-dim)
-            top_k: Number of results to return
-            namespace: Namespace to search (None for all)
-            filter_dict: Metadata filters
+            query_embedding: Query vector
+            top_k: Number of results
+            namespace: Namespace to search
         
         Returns:
-            List of matching documents with similarity scores
+            List of matching documents
         """
-        print("[PineconeStore] Searching with top_k:", top_k, "namespace:", namespace)
+        print("[PineconeStore] Searching, top_k:", top_k, "namespace:", namespace)
         
         results = self.index.query(
             vector=query_embedding,
@@ -184,7 +161,7 @@ class PineconeVectorStore:
         )
         
         # Format results
-        documents = []
+        docs = []
         for match in results.matches:
             doc = {
                 "id": match.id,
@@ -192,19 +169,14 @@ class PineconeVectorStore:
                 "similarity": f"{match.score * 100:.1f}%",
                 **match.metadata
             }
-            documents.append(doc)
+            docs.append(doc)
         
-        print("[PineconeStore] Found", len(documents), "results")
-        return documents
+        print("[PineconeStore] Found", len(docs), "results")
+        return docs
     
     def get_stats(self) -> Dict:
-        """
-        Get index statistics.
-        
-        Returns:
-            Dictionary with total vectors and namespace info
-        """
-        print("[PineconeStore] Getting index stats")
+        """Get index stats."""
+        print("[PineconeStore] Getting stats")
         stats = self.index.describe_index_stats()
         return {
             "total_vectors": stats.total_vector_count,
@@ -213,39 +185,18 @@ class PineconeVectorStore:
         }
     
     def delete_namespace(self, namespace: str):
-        """
-        Delete all vectors in a namespace.
-        
-        Args:
-            namespace: Namespace to clear
-        """
+        """Delete all vectors in namespace."""
         print("[PineconeStore] Deleting namespace:", namespace)
         self.index.delete(delete_all=True, namespace=namespace)
-        print("[PineconeStore] Namespace deleted")
-    
-    def delete_index(self):
-        """Delete the entire index."""
-        print("[PineconeStore] Deleting index:", self.index_name)
-        self.pc.delete_index(self.index_name)
-        print("[PineconeStore] Index deleted")
 
 
-# Singleton instance for reuse
-_pinecone_store = None
-
+# Singleton
+_store = None
 
 def get_pinecone_store() -> PineconeVectorStore:
-    """
-    Get or create the Pinecone vector store instance.
-    
-    This function returns a singleton instance to avoid
-    creating multiple connections to Pinecone.
-    
-    Returns:
-        PineconeVectorStore instance
-    """
-    global _pinecone_store
-    if _pinecone_store is None:
-        print("[PineconeStore] Creating new store instance")
-        _pinecone_store = PineconeVectorStore()
-    return _pinecone_store
+    """Get or create Pinecone store."""
+    global _store
+    if _store is None:
+        print("[PineconeStore] Creating store")
+        _store = PineconeVectorStore()
+    return _store
