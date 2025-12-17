@@ -103,10 +103,17 @@ class ClaimDecomposer:
     def _extract_keywords(self, claim: str) -> List[str]:
         """Extract important keywords from claim."""
         stop_words = {
+            # English
             "the", "a", "an", "is", "are", "was", "were", "has", "have",
             "will", "be", "been", "being", "that", "this", "it", "and",
             "or", "but", "if", "then", "so", "because", "as", "of", "in",
-            "on", "at", "to", "for", "with", "by", "from", "about"
+            "on", "at", "to", "for", "with", "by", "from", "about",
+            
+            # Sinhala
+            "සහ", "හා", "හෝ", "නිසා", "බැවින්", "විට", "වඩා", "ගැන", 
+            "තවත්", "මෙම", "ඔබ", "මම", "අපි", "ඔව්", "නැත", "ඇත", "nati",
+            "වෙත", "සඳහා", "මගින්", "විසින්", "ලෙස", "පිළිබඳ", "පිළිබඳව",
+            "තුළ", "මත", "සිට", "දක්වා", "හේතුවෙන්", "කර", "කරන", "කරයි"
         }
         
         words = re.findall(r'\b\w+\b', claim)

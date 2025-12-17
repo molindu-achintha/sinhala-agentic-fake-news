@@ -80,7 +80,17 @@ class CrossExaminer:
         # Step 6: Determine primary source priority
         source_priority = self._get_source_priority(decomposed, evidence)
         
-        # Step 7: Generate recommendation
+        # Step 7: Check topic relevance (Keyword Overlap)
+        relevance = self._check_topic_relevance(decomposed, labeled)
+        
+        # Adjust weighted score if topic mismatch
+        if not relevance["is_relevant"]:
+            print(f"[CrossExaminer] Topic mismatch detected (Overlap: {relevance['overlap_ratio']:.2f})")
+            weighted_score = 0
+            label_analysis["support_score"] = 0
+            label_analysis["has_labels"] = False  # Ignore labels from irrelevant docs
+            
+        # Step 8: Generate recommendation
         recommendation = self._generate_recommendation(
             label_analysis, 
             consensus, 
@@ -95,6 +105,7 @@ class CrossExaminer:
             "consensus": consensus,
             "weighted_score": weighted_score,
             "source_priority": source_priority,
+            "topic_relevance": relevance,
             "recommendation": recommendation,
             "confidence": self._calculate_confidence(label_analysis, evidence)
         }
@@ -103,6 +114,34 @@ class CrossExaminer:
         print("[CrossExaminer] Weighted score:", round(weighted_score, 2))
         
         return result
+
+    def _check_topic_relevance(self, decomposed: Dict, labeled: List[Dict]) -> Dict:
+        """
+        Check if evidence actually talks about the same topic.
+        Uses simplistic keyword overlap.
+        """
+        keywords = set(k.lower() for k in decomposed.get("keywords", []))
+        if not keywords or not labeled:
+            return {"is_relevant": True, "overlap_ratio": 1.0}  # Default to trust if no keywords
+            
+        max_overlap = 0.0
+        
+        for doc in labeled:
+            text = doc.get("text", "").lower()
+            # Simple check: how many keywords appear in text?
+            found = sum(1 for k in keywords if k in text)
+            ratio = found / len(keywords)
+            max_overlap = max(max_overlap, ratio)
+            
+        # Threshold: meaningful overlap needed
+        # If overlap is < 20% (e.g. 0 out of 4 keywords), it's likely a topic drift
+        is_relevant = max_overlap >= 0.20
+        
+        return {
+            "is_relevant": is_relevant,
+            "overlap_ratio": max_overlap,
+            "keyword_count": len(keywords)
+        }
     
     def _check_date_consistency(self, decomposed: Dict, labeled: List[Dict]) -> Dict:
         """Check if claim date matches evidence dates."""
