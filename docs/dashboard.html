@@ -401,7 +401,10 @@ Example:
 
     <script>
         // API Base URL
-        const API_BASE = 'http://localhost:8000';
+        // API Base URL
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:8000'
+            : 'https://sinhala-agentic-fake-news.onrender.com';
 
         // Store CSV data and results
         let csvData = [];

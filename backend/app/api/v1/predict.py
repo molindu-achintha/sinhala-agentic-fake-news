@@ -56,7 +56,6 @@ async def predict(request: PredictRequest):
     Returns:
         PredictResponse with full verification result
     """
-    print("=" * 60)
     print("[predict] New verification request")
     print("[predict] Text length:", len(request.text))
     
@@ -74,7 +73,6 @@ async def predict(request: PredictRequest):
         result = verifier.verify(request.text)
         
         print("[predict] Verification complete")
-        print("=" * 60)
         
         return PredictResponse(
             claim=result["claim"],
