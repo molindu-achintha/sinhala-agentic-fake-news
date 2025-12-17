@@ -18,3 +18,5 @@ beautifulsoup4
 lxml
 aiohttp
 pinecone
+redis
+psycopg2-binary

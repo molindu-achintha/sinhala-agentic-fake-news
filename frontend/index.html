@@ -1,52 +1,42 @@
 <!DOCTYPE html>
 <html lang="si">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sinhala Fake News Detector</title>
+    <meta name="description" content="AI powered Sinhala fake news detection system using Temporal Hybrid Verification">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>සිංහල ව්‍යාජ පුවත් හඳුනාගැනීම</h1>
-            <p>Agentic AI මගින් බල ගැන්වේ</p>
+            <p>Sinhala Fake News Detector</p>
+            <p class="subtitle">Powered by Temporal Hybrid Verification</p>
         </header>
 
         <main>
             <div class="input-section">
-                <textarea id="newsInput" placeholder="පුවත මෙහි ඇතුළත් කරන්න..."></textarea>
+                <textarea id="claimInput" placeholder="පුවත මෙහි ඇතුළත් කරන්න / Enter news claim here..."></textarea>
                 <div class="controls">
-                    <button id="checkBtn">පරීක්ෂා කරන්න</button>
-                    <div id="loader" class="hidden">පරීක්ෂා කරමින්...</div>
+                    <button id="checkButton">පරීක්ෂා කරන්න / Verify</button>
+                    <div id="loader" class="hidden">Verifying...</div>
                 </div>
             </div>
 
-            <div id="resultSection" class="result-section hidden">
-                <div id="verdictBadge" class="badge"></div>
-                
-                <div class="card">
-                    <h3>ප්‍රකාශය (Claim)</h3>
-                    <p id="claimText"></p>
-                </div>
-
-                <div class="card">
-                    <h3>පැහැදිලි කිරීම</h3>
-                    <p id="explanationText"></p>
-                </div>
-
-                <div class="card">
-                    <h3>හේතු දැක්වීම (Reasoning)</h3>
-                    <ul id="reasoningList"></ul>
-                </div>
-
-                <div class="card">
-                    <h3>මූලාශ්‍ර (Sources)</h3>
-                    <ul id="sourcesList"></ul>
-                </div>
+            <div id="resultSection" class="result-section" style="display: none;">
+                <!-- Results will be populated by JavaScript -->
             </div>
         </main>
+
+        <footer>
+            <p>Agentic AI Research Project</p>
+            <p>Uses Redis cache and PostgreSQL for memory</p>
+        </footer>
     </div>
     <script src="script.js"></script>
 </body>
+
 </html>

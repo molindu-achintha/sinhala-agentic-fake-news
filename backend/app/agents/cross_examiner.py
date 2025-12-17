@@ -1,11 +1,8 @@
 """
-cross_examiner.py - Evidence Cross-Examination
+cross_examiner.py
 
-Analyzes and weights evidence from multiple sources:
-1. Date consistency check
-2. Consensus check (do sources agree?)
-3. Conflict resolution
-4. Evidence weighting by source reliability
+Evidence Cross Examination Agent.
+Analyzes and weights evidence from multiple sources.
 """
 from typing import Dict, List
 from datetime import datetime
@@ -14,21 +11,18 @@ from collections import Counter
 
 class CrossExaminer:
     """
-    Cross-examines evidence to determine reliability and consensus.
+    Cross examines evidence to determine reliability and consensus.
     """
     
     # Source reliability weights
     SOURCE_WEIGHTS = {
-        # Trusted news sources (high weight)
         "BBC Sinhala": 1.0,
         "Hiru News": 0.9,
         "Ada Derana": 0.9,
         "Lankadeepa": 0.9,
         "ITN News": 0.8,
-        # Social media (lower weight)
         "Twitter": 0.5,
         "Facebook": 0.4,
-        # Unknown
         "unknown": 0.3
     }
     
@@ -44,7 +38,7 @@ class CrossExaminer:
     }
     
     def __init__(self):
-        """Initialize cross-examiner."""
+        """Initialize cross examiner."""
         print("[CrossExaminer] Initialized")
     
     def examine(
@@ -53,16 +47,16 @@ class CrossExaminer:
         decomposed: Dict
     ) -> Dict:
         """
-        Cross-examine all evidence and determine verdict recommendation.
+        Cross examine all evidence and determine verdict recommendation.
         
         Args:
             evidence: Output from HybridRetriever
             decomposed: Output from ClaimDecomposer
         
         Returns:
-            Dict with weighted evidence, consensus, and recommendation
+            Dict with weighted evidence consensus and recommendation
         """
-        print("[CrossExaminer] Starting cross-examination")
+        print("[CrossExaminer] Starting cross examination")
         
         labeled = evidence.get("labeled_history", [])
         unlabeled = evidence.get("unlabeled_context", [])
@@ -71,10 +65,10 @@ class CrossExaminer:
         # Step 1: Date consistency check
         date_analysis = self._check_date_consistency(decomposed, labeled)
         
-        # Step 2: Analyze labeled evidence (high weight)
+        # Step 2: Analyze labeled evidence
         label_analysis = self._analyze_labels(labeled)
         
-        # Step 3: Check for zombie rumors (recurring fake news)
+        # Step 3: Check for zombie rumors
         zombie_check = self._check_zombie_rumors(labeled)
         
         # Step 4: Determine consensus
@@ -105,8 +99,8 @@ class CrossExaminer:
             "confidence": self._calculate_confidence(label_analysis, evidence)
         }
         
-        print(f"[CrossExaminer] Recommendation: {recommendation}")
-        print(f"[CrossExaminer] Weighted score: {weighted_score:.2f}")
+        print("[CrossExaminer] Recommendation:", recommendation)
+        print("[CrossExaminer] Weighted score:", round(weighted_score, 2))
         
         return result
     
@@ -120,19 +114,19 @@ class CrossExaminer:
                 "type": "historical",
                 "claim_years": claim_years,
                 "trust_db": True,
-                "message": "Historical claim - Vector DB is authoritative"
+                "message": "Historical claim Vector DB is authoritative"
             }
         elif temporal_type == "recent":
             return {
                 "type": "recent",
                 "trust_db": False,
-                "message": "Recent claim - Web search recommended"
+                "message": "Recent claim Web search recommended"
             }
         else:
             return {
                 "type": "general",
                 "trust_db": True,
-                "message": "General claim - Using all sources"
+                "message": "General claim Using all sources"
             }
     
     def _analyze_labels(self, labeled: List[Dict]) -> Dict:
@@ -172,7 +166,7 @@ class CrossExaminer:
         }
     
     def _check_zombie_rumors(self, labeled: List[Dict]) -> Dict:
-        """Check if this is a known recurring fake news (zombie rumor)."""
+        """Check if this is a known recurring fake news zombie rumor."""
         for doc in labeled:
             label = doc.get("label", "").lower()
             similarity = doc.get("score", 0)
@@ -197,7 +191,7 @@ class CrossExaminer:
             return {
                 "has_consensus": False,
                 "type": "conflict",
-                "message": "Sources disagree - needs verification"
+                "message": "Sources disagree needs verification"
             }
         elif true_count > 0:
             return {
@@ -227,7 +221,7 @@ class CrossExaminer:
         total_score = 0
         total_weight = 0
         
-        # Labeled evidence (high weight)
+        # Labeled evidence high weight
         for doc in labeled:
             label = doc.get("label", "").lower()
             similarity = doc.get("score", 0.5)
@@ -243,7 +237,7 @@ class CrossExaminer:
         # Unlabeled contributes less
         for doc in unlabeled:
             similarity = doc.get("score", 0.5)
-            weight = similarity * 0.2  # Low weight for unlabeled
+            weight = similarity * 0.2
             total_weight += weight
         
         if total_weight == 0:

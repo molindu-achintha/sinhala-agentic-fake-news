@@ -1,11 +1,8 @@
 """
-claim_decomposer.py - Claim Decomposition Agent
+claim_decomposer.py
 
-Breaks down claims into atomic facts, extracts:
-- Keywords for vector search
-- Dates (for temporal routing)
-- Entities (people, organizations)
-- Claim type (event, statement, statistic)
+Claim Decomposition Agent.
+Breaks down claims into keywords dates and temporal type.
 """
 import re
 from datetime import datetime
@@ -41,7 +38,7 @@ class ClaimDecomposer:
             claim: The raw claim text
         
         Returns:
-            Dict with keywords, dates, entities, temporal_type
+            Dict with keywords dates temporal_type
         """
         print("[ClaimDecomposer] Decomposing claim")
         
@@ -62,14 +59,14 @@ class ClaimDecomposer:
             "original_claim": claim,
             "keywords": keywords,
             "years": years,
-            "temporal_type": temporal_type,  # "recent", "historical", "general"
+            "temporal_type": temporal_type,
             "vector_query": vector_query,
             "web_query": web_query,
             "needs_web_search": temporal_type == "recent"
         }
         
-        print(f"[ClaimDecomposer] Temporal type: {temporal_type}")
-        print(f"[ClaimDecomposer] Keywords: {keywords[:5]}...")
+        print("[ClaimDecomposer] Temporal type:", temporal_type)
+        print("[ClaimDecomposer] Keywords:", keywords[:5])
         
         return result
     
@@ -83,9 +80,7 @@ class ClaimDecomposer:
         Determine if claim is about recent or historical events.
         
         Returns:
-            "recent" - needs web search
-            "historical" - trust vector DB
-            "general" - search both
+            recent historical or general
         """
         claim_lower = claim.lower()
         
@@ -103,12 +98,10 @@ class ClaimDecomposer:
             elif max_year <= 2023:
                 return "historical"
         
-        # Default to general
         return "general"
     
     def _extract_keywords(self, claim: str) -> List[str]:
         """Extract important keywords from claim."""
-        # Remove common stop words
         stop_words = {
             "the", "a", "an", "is", "are", "was", "were", "has", "have",
             "will", "be", "been", "being", "that", "this", "it", "and",
@@ -116,7 +109,6 @@ class ClaimDecomposer:
             "on", "at", "to", "for", "with", "by", "from", "about"
         }
         
-        # Split and clean
         words = re.findall(r'\b\w+\b', claim)
         keywords = [w for w in words if w.lower() not in stop_words and len(w) > 2]
         
@@ -124,12 +116,10 @@ class ClaimDecomposer:
     
     def _create_vector_query(self, claim: str, keywords: List[str]) -> str:
         """Create optimized query for vector search."""
-        # Use full claim for semantic search
         return claim
     
     def _create_web_query(self, claim: str, keywords: List[str]) -> str:
         """Create query for web search."""
-        # Use keywords + date for web search
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now().strftime("%Y %m %d")
         keyword_str = " ".join(keywords[:5])
-        return f"verify {keyword_str} {date_str}"
+        return "verify " + keyword_str + " " + date_str

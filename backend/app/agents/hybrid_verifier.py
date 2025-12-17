@@ -2,7 +2,7 @@
 hybrid_verifier.py
 
 Temporal Hybrid Verifier main orchestrator.
-Coordinates the full verification pipeline.
+Coordinates the full verification pipeline with memory caching.
 """
 from typing import Dict, Optional
 
@@ -11,44 +11,57 @@ from .hybrid_retriever import HybridRetriever
 from .cross_examiner import CrossExaminer
 from .cot_reasoner import CoTReasoner
 from .verdict_agent import VerdictAgent
+from ..store.memory_store import get_memory_manager
 
 
 class HybridVerifier:
     """
     Main orchestrator for Temporal Hybrid Verification.
+    Uses Redis for short term cache and PostgreSQL for long term memory.
     
     Flow:
-    1. Decompose claim
-    2. Retrieve evidence from Vector DB
-    3. Cross examine evidence
-    4. Chain of Thought reasoning with LLM
-    5. Generate final verdict
+    1. Check memory cache for existing result
+    2. If not cached, run full verification pipeline
+    3. Store result in both short and long term memory
     """
     
     def __init__(self):
-        """Initialize all agents."""
+        """Initialize all agents and memory."""
         print("[HybridVerifier] Initializing")
         
+        # Initialize agents
         self.decomposer = ClaimDecomposer()
         self.retriever = HybridRetriever()
         self.examiner = CrossExaminer()
         self.reasoner = CoTReasoner()
         self.verdict_agent = VerdictAgent()
         
-        print("[HybridVerifier] All agents initialized")
+        # Initialize memory manager
+        self.memory = get_memory_manager()
+        
+        print("[HybridVerifier] All agents and memory initialized")
     
-    def verify(self, claim: str) -> Dict:
+    def verify(self, claim: str, use_cache: bool = True) -> Dict:
         """
         Verify a claim using the full hybrid pipeline.
         
         Args:
             claim: The news claim to verify
+            use_cache: Whether to check cache first
         
         Returns:
-            Complete verification result with verdict evidence reasoning
+            Complete verification result
         """
         print("[HybridVerifier] Starting verification")
         print("[HybridVerifier] Claim:", claim[:100])
+        
+        # Step 0: Check memory cache
+        if use_cache:
+            cached_result = self.memory.get_cached_result(claim)
+            if cached_result:
+                print("[HybridVerifier] Returning cached result")
+                cached_result["from_cache"] = True
+                return cached_result
         
         # Step 1: Decompose claim
         print("[HybridVerifier] Step 1 Decomposing claim")
@@ -62,10 +75,10 @@ class HybridVerifier:
         print("[HybridVerifier] Step 3 Cross examining evidence")
         cross_exam = self.examiner.examine(evidence, decomposed)
         
-        # Step 4: Get few shot examples from high similarity labeled matches
+        # Step 4: Get few shot examples
         few_shot_examples = self._get_few_shot_examples(evidence)
         
-        # Step 5: Chain of Thought reasoning with LLM
+        # Step 5: Chain of Thought reasoning
         print("[HybridVerifier] Step 4 Chain of Thought reasoning")
         cot_result = self.reasoner.reason(
             claim, 
@@ -76,7 +89,7 @@ class HybridVerifier:
         
         # Step 6: Generate final verdict
         print("[HybridVerifier] Step 5 Generating verdict")
-        verdict = self._generate_final_verdict(
+        result = self._generate_final_verdict(
             claim, 
             decomposed, 
             evidence, 
@@ -84,11 +97,16 @@ class HybridVerifier:
             cot_result
         )
         
-        print("[HybridVerifier] Verification complete")
-        print("[HybridVerifier] Verdict:", verdict['verdict']['label'])
-        print("[HybridVerifier] Confidence:", verdict['verdict']['confidence'])
+        # Step 7: Store in memory
+        print("[HybridVerifier] Step 6 Storing in memory")
+        self.memory.store_result(claim, result)
         
-        return verdict
+        result["from_cache"] = False
+        
+        print("[HybridVerifier] Verification complete")
+        print("[HybridVerifier] Verdict:", result['verdict']['label'])
+        
+        return result
     
     def _get_few_shot_examples(self, evidence: Dict) -> list:
         """Extract few shot examples from labeled evidence."""
@@ -193,6 +211,10 @@ class HybridVerifier:
             })
         
         return citations
+    
+    def get_memory_stats(self) -> Dict:
+        """Get memory statistics."""
+        return self.memory.get_stats()
 
 
 # Create singleton instance
