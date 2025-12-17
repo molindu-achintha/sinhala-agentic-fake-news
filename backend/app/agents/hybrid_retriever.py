@@ -6,8 +6,9 @@ Retrieves evidence from Vector DB and separates labeled from unlabeled.
 """
 from typing import Dict, List, Optional
 import numpy as np
+from duckduckgo_search import DDGS
 
-from ..store.pinecone_store import PineconeVectorStore
+from ..store.pinecone_store import get_pinecone_store
 from .langproc_agent import LangProcAgent
 
 
@@ -27,7 +28,7 @@ class HybridRetriever:
         """Initialize retriever with stores."""
         print("[HybridRetriever] Initializing")
         self.lang_proc = LangProcAgent()
-        self.vector_store = PineconeVectorStore()
+        self.vector_store = get_pinecone_store()
         print("[HybridRetriever] Ready")
     
     def retrieve(
@@ -46,7 +47,7 @@ class HybridRetriever:
         english_web_query = decomposed.get("english_web_query", "")
         
         # 1. Get embedding
-        emb_vector = self.encoder.get_embeddings(vector_query)
+        emb_vector = self.lang_proc.get_embeddings(vector_query)
         
         # 2. Search Vector DB (Labeled & Unlabeled)
         labeled_results = self._search_namespace(emb_vector, "labeled_news", top_k=5)

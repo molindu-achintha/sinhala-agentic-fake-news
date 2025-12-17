@@ -6,6 +6,10 @@ Settings are loaded from environment variables or .env file.
 """
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
+
+# Calculate .env path at module level (project root / .env)
+_ENV_FILE_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -44,12 +48,9 @@ class Settings(BaseSettings):
 
     class Config:
         """Configuration for settings loading."""
-        # Use absolute path to find .env in project root
-        from pathlib import Path
-        _config_file = Path(__file__).resolve().parent.parent.parent / ".env"
-        env_file = str(_config_file)
+        env_file = str(_ENV_FILE_PATH)
         env_file_encoding = "utf-8"
-        extra = "ignore" # Ignore extra fields in .env
+        extra = "ignore"  # Ignore extra fields in .env
 
 
 @lru_cache()

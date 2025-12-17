@@ -18,7 +18,7 @@ from ...config import get_settings
 
 router = APIRouter()
 
-# Initialize hybrid verifier (lazy loading)
+# Initialize hybrid verifier
 print("[predict] Prediction API ready")
 
 
