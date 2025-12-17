@@ -48,44 +48,52 @@ class HybridRetriever:
         """
         print("[HybridRetriever] Starting retrieval")
         
-        # Generate embedding for claim
-        query = decomposed.get("vector_query", claim)
-        embedding = self.lang_proc.get_embeddings(query)
+        vector_query = decomposed.get("vector_query", "")
+        web_query = decomposed.get("web_query", "")
         
-        # Search both namespaces
-        dataset_results = self._search_namespace(embedding, "dataset", top_k)
-        live_news_results = self._search_namespace(embedding, "live_news", top_k)
+        # 1. Get embedding
+        emb_vector = self.encoder.get_embeddings(vector_query)
         
-        # Combine all results
-        all_results = dataset_results + live_news_results
+        # 2. Search Vector DB (Labeled & Unlabeled)
+        labeled_results = self._search_namespace(emb_vector, "labeled_news", top_k=5)
+        unlabeled_results = self._search_namespace(emb_vector, "unlabeled_news", top_k=5)
         
-        # Separate labeled vs unlabeled
-        labeled_history = []
-        unlabeled_context = []
+        # Combine for analysis
+        all_results = labeled_results + unlabeled_results
+        labeled_history = [d for d in all_results if d.get("namespace") == "labeled_news"]
+        unlabeled_context = [d for d in all_results if d.get("namespace") == "unlabeled_news"]
         
-        for doc in all_results:
-            label = doc.get("label", "").lower()
-            if label in ["true", "false", "misleading", "fake"]:
-                labeled_history.append(doc)
-            else:
-                unlabeled_context.append(doc)
-        
-        # Sort by similarity
-        labeled_history.sort(key=lambda x: x.get("score", 0), reverse=True)
-        unlabeled_context.sort(key=lambda x: x.get("score", 0), reverse=True)
-        
-        # Get top similarity
+        # Calculate text similarity
         top_similarity = 0
         if all_results:
             top_similarity = max(doc.get("score", 0) for doc in all_results)
         
-        # Determine if web search needed
+        # 3. Web Search (if needed)
         needs_web = self._should_search_web(decomposed, top_similarity)
-        
-        # Web search placeholder
         web_results = []
+        
         if needs_web:
-            print("[HybridRetriever] Web search would be triggered")
+            print(f"[HybridRetriever] Triggering Web Search query: {web_query}")
+            try:
+                web_results = self._perform_web_search(web_query)
+                print(f"[HybridRetriever] Found {len(web_results)} web results")
+            except Exception as e:
+                print(f"[HybridRetriever] Web search failed: {e}")
+        
+        # Add web results to context
+        # Convert web results to standardized format
+        formatted_web = []
+        for res in web_results:
+            formatted_web.append({
+                "text": res.get("body", "") or res.get("title", ""),
+                "source": res.get("title", "Web Source"),
+                "url": res.get("href", ""),
+                "score": 0.8, # Estimated relevance
+                "label": "unverified"
+            })
+            
+        # Add to unlabeled context
+        unlabeled_context.extend(formatted_web)
         
         result = {
             "labeled_history": labeled_history[:5],
@@ -138,9 +146,29 @@ class HybridRetriever:
         """Categorize similarity score."""
         if score >= self.HIGH_SIMILARITY:
             return "high"
-        elif score >= self.MEDIUM_SIMILARITY:
-            return "medium"
         elif score >= self.LOW_SIMILARITY:
-            return "low"
+            return "medium"
         else:
-            return "none"
+            return "low"
+
+    def _perform_web_search(self, query: str) -> List[Dict]:
+        """Execute web search using DuckDuckGo."""
+        results = []
+        try:
+            with DDGS() as ddgs:
+                # Search for news references
+                search_results = ddgs.text(
+                    query, 
+                    region="lk-en", # Prioritize Sri Lanka
+                    safesearch="off", 
+                    max_results=5
+                )
+                
+                if search_results:
+                    results = list(search_results)
+                    
+        except Exception as e:
+            print(f"[HybridRetriever] DDGS Error: {e}")
+            
+        return results
+```

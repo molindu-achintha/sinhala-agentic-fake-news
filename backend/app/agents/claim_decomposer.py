@@ -127,6 +127,7 @@ class ClaimDecomposer:
     
     def _create_web_query(self, claim: str, keywords: List[str]) -> str:
         """Create query for web search."""
-        date_str = datetime.now().strftime("%Y %m %d")
-        keyword_str = " ".join(keywords[:5])
-        return "verify " + keyword_str + " " + date_str
+        # Use the first 5-7 meaningful keywords for search
+        # Avoid adding "verify" or english words to Sinhala queries
+        query = " ".join(keywords[:7])
+        return query
