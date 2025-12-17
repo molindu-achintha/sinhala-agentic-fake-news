@@ -5,35 +5,278 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sinhala Fake News Detector</title>
-    <meta name="description" content="AI powered Sinhala fake news detection system using Temporal Hybrid Verification">
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="AI powered Sinhala fake news detection using Temporal Hybrid Verification">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .nav-links a {
+            color: #00d4ff;
+            text-decoration: none;
+            padding: 8px 15px;
+            border: 1px solid #00d4ff;
+            border-radius: 20px;
+            transition: all 0.3s;
+        }
+
+        .nav-links a:hover {
+            background: #00d4ff;
+            color: #1a1a2e;
+        }
+
+        .input-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1.1rem;
+            resize: vertical;
+            min-height: 150px;
+            margin-bottom: 15px;
+        }
+
+        textarea::placeholder {
+            color: #666;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loader {
+            display: none;
+            color: #00d4ff;
+        }
+
+        .result-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-card {
+            text-align: center;
+        }
+
+        .verdict-badge {
+            display: inline-block;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .verdict-true {
+            background: #10b981;
+        }
+
+        .verdict-false {
+            background: #ef4444;
+        }
+
+        .verdict-misleading {
+            background: #f59e0b;
+        }
+
+        .verdict-needs_verification {
+            background: #6366f1;
+        }
+
+        .verdict-unverified {
+            background: #6b7280;
+        }
+
+        .verdict-likely_true {
+            background: #34d399;
+        }
+
+        .verdict-likely_false {
+            background: #f87171;
+        }
+
+        .confidence {
+            font-size: 1.2rem;
+            color: #00d4ff;
+            margin-bottom: 20px;
+        }
+
+        .cache-indicator {
+            display: inline-block;
+            padding: 5px 15px;
+            background: #4c1d95;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .explanations {
+            text-align: left;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .explanations .sinhala {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        .explanations .english {
+            color: #888;
+        }
+
+        .evidence-summary {
+            margin: 20px 0;
+            color: #888;
+        }
+
+        .citations {
+            text-align: left;
+            margin-top: 20px;
+        }
+
+        .citations h4 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .citations ul {
+            list-style: none;
+        }
+
+        .citations li {
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        #statusMessage {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         <header>
             <h1>සිංහල ව්‍යාජ පුවත් හඳුනාගැනීම</h1>
-            <p>Sinhala Fake News Detector</p>
-            <p class="subtitle">Powered by Temporal Hybrid Verification</p>
+            <p class="subtitle">Sinhala Fake News Detector</p>
+            <p class="subtitle">Temporal Hybrid Verification with AI</p>
+            <div class="nav-links">
+                <a href="index.html">Main App</a>
+                <a href="dashboard.html">Evaluation Dashboard</a>
+            </div>
         </header>
 
         <main>
             <div class="input-section">
-                <textarea id="claimInput" placeholder="පුවත මෙහි ඇතුළත් කරන්න / Enter news claim here..."></textarea>
+                <textarea id="claimInput" placeholder="පුවත මෙහි ඇතුළත් කරන්න...
+Enter a news claim to verify...
+
+Example: ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි"></textarea>
                 <div class="controls">
                     <button id="checkButton">පරීක්ෂා කරන්න / Verify</button>
-                    <div id="loader" class="hidden">Verifying...</div>
+                    <span class="loader" id="loader">Verifying...</span>
                 </div>
             </div>
 
             <div id="resultSection" class="result-section" style="display: none;">
-                <!-- Results will be populated by JavaScript -->
             </div>
         </main>
 
         <footer>
-            <p>Agentic AI Research Project</p>
-            <p>Uses Redis cache and PostgreSQL for memory</p>
+            <p>Sinhala Agentic Fake News Detection</p>
+            <p>Uses Redis cache, PostgreSQL memory, and Pinecone vector DB</p>
         </footer>
     </div>
     <script src="script.js"></script>

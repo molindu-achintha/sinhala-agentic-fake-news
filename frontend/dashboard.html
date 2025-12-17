@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Dashboard - Sinhala Fake News Detector</title>
+    <meta name="description" content="Evaluation dashboard for Sinhala fake news detection system">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-label {
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .results-table th,
+        .results-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .results-table th {
+            background: rgba(0, 0, 0, 0.3);
+            color: #00d4ff;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .badge-true {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .badge-false {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .badge-correct {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .badge-incorrect {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .memory-indicator {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .memory-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .memory-redis {
+            background: #dc382d;
+        }
+
+        .memory-postgres {
+            background: #336791;
+        }
+
+        .memory-cookie {
+            background: #f7df1e;
+            color: #000;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .nav-links a {
+            color: #00d4ff;
+            text-decoration: none;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+
+        .chart-placeholder {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Evaluation Dashboard</h1>
+            <p class="subtitle">Sinhala Fake News Detection System</p>
+            <div class="nav-links">
+                <a href="index.html">Main App</a>
+                <a href="dashboard.html">Dashboard</a>
+            </div>
+        </header>
+
+        <div class="memory-indicator">
+            <span class="memory-badge memory-cookie">Cookies: Session</span>
+            <span class="memory-badge memory-redis" id="redisStatus">Redis: Checking...</span>
+            <span class="memory-badge memory-postgres" id="postgresStatus">PostgreSQL: Checking...</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalVerified">0</div>
+                <div class="stat-label">Total Verified</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="accuracy">0%</div>
+                <div class="stat-label">Accuracy</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="cacheHits">0</div>
+                <div class="stat-label">Cache Hits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgLatency">0ms</div>
+                <div class="stat-label">Avg Latency</div>
+            </div>
+        </div>
+
+        <div class="card test-section">
+            <h3>Quick Evaluation Test</h3>
+            <textarea id="testInput" placeholder="Enter claims to test, one per line...
+Example:
+ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි|true
+අද රට පුරා ඇදිරි නීතිය පනවා ඇත|false"></textarea>
+            <button id="runTest" onclick="runEvaluation()">Run Evaluation</button>
+        </div>
+
+        <div class="card">
+            <h3>Evaluation Results</h3>
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Claim</th>
+                        <th>Expected</th>
+                        <th>Predicted</th>
+                        <th>Result</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                    <tr>
+                        <td colspan="5" class="loading">Run an evaluation to see results</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3>Session History (Cookies)</h3>
+            <div class="history-list" id="historyList">
+                <p class="loading">No history yet</p>
+            </div>
+            <button onclick="clearHistory()">Clear History</button>
+        </div>
+
+        <div class="card">
+            <h3>Memory Statistics</h3>
+            <div id="memoryStats" class="loading">Loading memory stats...</div>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL
+        const API_BASE = window.API_BASE || 'https://sinhala-fake-news-api.onrender.com';
+
+        // Cookie utilities
+        const Cookies = {
+            set: function (name, value, days) {
+                let expires = '';
+                if (days) {
+                    const date = new Date();
+                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                    expires = '; expires=' + date.toUTCString();
+                }
+                document.cookie = name + '=' + encodeURIComponent(JSON.stringify(value)) + expires + '; path=/';
+            },
+            get: function (name) {
+                const nameEQ = name + '=';
+                const ca = document.cookie.split(';');
+                for (let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) === 0) {
+                        try {
+                            return JSON.parse(decodeURIComponent(c.substring(nameEQ.length, c.length)));
+                        } catch {
+                            return null;
+                        }
+                    }
+                }
+                return null;
+            },
+            delete: function (name) {
+                document.cookie = name + '=; Max-Age=-99999999; path=/';
+            }
+        };
+
+        // Session storage for quick access
+        const SessionMemory = {
+            history: [],
+            stats: {
+                total: 0,
+                correct: 0,
+                cacheHits: 0,
+                totalLatency: 0
+            },
+
+            load: function () {
+                const saved = Cookies.get('eval_session');
+                if (saved) {
+                    this.history = saved.history || [];
+                    this.stats = saved.stats || this.stats;
+                }
+                this.updateUI();
+            },
+
+            save: function () {
+                Cookies.set('eval_session', {
+                    history: this.history.slice(-50),
+                    stats: this.stats
+                }, 7);
+            },
+
+            addResult: function (claim, expected, predicted, latency, fromCache) {
+                const correct = expected === predicted;
+                this.history.unshift({
+                    claim: claim.substring(0, 50),
+                    expected,
+                    predicted,
+                    correct,
+                    latency,
+                    fromCache,
+                    timestamp: new Date().toISOString()
+                });
+
+                this.stats.total++;
+                if (correct) this.stats.correct++;
+                if (fromCache) this.stats.cacheHits++;
+                this.stats.totalLatency += latency;
+
+                this.save();
+                this.updateUI();
+            },
+
+            updateUI: function () {
+                document.getElementById('totalVerified').textContent = this.stats.total;
+                document.getElementById('accuracy').textContent =
+                    this.stats.total > 0 ? Math.round((this.stats.correct / this.stats.total) * 100) + '%' : '0%';
+                document.getElementById('cacheHits').textContent = this.stats.cacheHits;
+                document.getElementById('avgLatency').textContent =
+                    this.stats.total > 0 ? Math.round(this.stats.totalLatency / this.stats.total) + 'ms' : '0ms';
+
+                this.renderHistory();
+            },
+
+            renderHistory: function () {
+                const list = document.getElementById('historyList');
+                if (this.history.length === 0) {
+                    list.innerHTML = '<p class="loading">No history yet</p>';
+                    return;
+                }
+
+                list.innerHTML = this.history.slice(0, 20).map(item =>
+                    '<div class="history-item">' +
+                    '<span>' + item.claim + '...</span>' +
+                    '<span class="badge badge-' + (item.correct ? 'correct' : 'incorrect') + '">' +
+                    (item.correct ? 'Correct' : 'Incorrect') +
+                    '</span>' +
+                    '</div>'
+                ).join('');
+            },
+
+            clear: function () {
+                this.history = [];
+                this.stats = { total: 0, correct: 0, cacheHits: 0, totalLatency: 0 };
+                Cookies.delete('eval_session');
+                this.updateUI();
+            }
+        };
+
+        // Run evaluation
+        async function runEvaluation() {
+            const input = document.getElementById('testInput').value.trim();
+            if (!input) {
+                alert('Please enter test claims');
+                return;
+            }
+
+            const lines = input.split('\n').filter(l => l.trim());
+            const tests = lines.map(line => {
+                const [text, expected] = line.split('|');
+                return { text: text.trim(), expected: (expected || 'unknown').trim() };
+            });
+
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '<tr><td colspan="5" class="loading">Running evaluation...</td></tr>';
+
+            const results = [];
+
+            for (const test of tests) {
+                const startTime = Date.now();
+                try {
+                    const response = await fetch(API_BASE + '/v1/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: test.text })
+                    });
+
+                    const data = await response.json();
+                    const latency = Date.now() - startTime;
+                    const predicted = data.verdict?.label || 'unknown';
+                    const fromCache = data.from_cache || false;
+
+                    results.push({
+                        claim: test.text,
+                        expected: test.expected,
+                        predicted,
+                        correct: test.expected === predicted,
+                        latency,
+                        fromCache
+                    });
+
+                    SessionMemory.addResult(test.text, test.expected, predicted, latency, fromCache);
+
+                } catch (error) {
+                    results.push({
+                        claim: test.text,
+                        expected: test.expected,
+                        predicted: 'error',
+                        correct: false,
+                        latency: Date.now() - startTime,
+                        error: error.message
+                    });
+                }
+            }
+
+            renderResults(results);
+        }
+
+        function renderResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = results.map(r =>
+                '<tr>' +
+                '<td>' + r.claim.substring(0, 40) + '...</td>' +
+                '<td><span class="badge badge-' + r.expected + '">' + r.expected + '</span></td>' +
+                '<td><span class="badge badge-' + r.predicted + '">' + r.predicted + '</span></td>' +
+                '<td><span class="badge badge-' + (r.correct ? 'correct' : 'incorrect') + '">' +
+                (r.correct ? 'Correct' : 'Wrong') + '</span></td>' +
+                '<td>' + r.latency + 'ms' + (r.fromCache ? ' (cached)' : '') + '</td>' +
+                '</tr>'
+            ).join('');
+        }
+
+        function clearHistory() {
+            if (confirm('Clear all session history?')) {
+                SessionMemory.clear();
+            }
+        }
+
+        // Check backend status
+        async function checkBackendStatus() {
+            try {
+                const response = await fetch(API_BASE + '/v1/health');
+                const data = await response.json();
+
+                document.getElementById('redisStatus').textContent = 'Redis: ' + (data.redis || 'Unknown');
+                document.getElementById('postgresStatus').textContent = 'PostgreSQL: ' + (data.postgres || 'Unknown');
+
+                if (data.memory_stats) {
+                    document.getElementById('memoryStats').innerHTML =
+                        '<p>Long Term Memory: ' + (data.memory_stats.long_term?.total_claims || 0) + ' claims stored</p>' +
+                        '<p>Short Term Cache: ' + (data.memory_stats.short_term?.type || 'in_memory') + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('redisStatus').textContent = 'Redis: Offline';
+                document.getElementById('postgresStatus').textContent = 'PostgreSQL: Offline';
+                document.getElementById('memoryStats').innerHTML = '<p>Backend not available</p>';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('[Dashboard] Initializing');
+            SessionMemory.load();
+            checkBackendStatus();
+        });
+    </script>
+</body>
+
+</html>
