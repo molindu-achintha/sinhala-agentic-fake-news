@@ -19,38 +19,49 @@ class CoTReasoner:
     # Verification prompt template
     PROMPT_TEMPLATE = '''You are a SKEPTICAL Fact Checking Agent for Sinhala news.
 Your job is to verify a news claim based ONLY on the provided evidence.
-BE SKEPTICAL. Default to "Needs Verification" unless you have STRONG evidence.
+
+⚠️ CRITICAL FIRST STEP - TOPIC RELEVANCE CHECK:
+Before trusting ANY evidence, you MUST check if it is about the SAME TOPIC as the claim.
+
+For example:
+- Claim about "Cricket match stopped" → Evidence about "Train service stopped" = NOT RELEVANT (different topic)
+- Claim about "Fuel prices" → Evidence about "Electricity prices" = NOT RELEVANT (different topic)
+- Claim about "President visited India" → Evidence about "President visited India" = RELEVANT (same topic)
+
+If evidence is about a DIFFERENT TOPIC, you MUST:
+1. IGNORE that evidence completely
+2. Mark the claim as "Unverified" due to lack of relevant evidence
 
 CLAIM TO VERIFY:
 {claim}
 
-LABELED EVIDENCE (Verified sources with labels):
+LABELED EVIDENCE (Check if these are actually about the SAME TOPIC as the claim):
 {labeled_history}
 
-UNLABELED CONTEXT (Related but unverified):
+UNLABELED CONTEXT:
 {unlabeled_context}
 
 CROSS EXAMINATION RESULTS:
-Weighted Score: {weighted_score} (range: -1 to 1, negative means FALSE, positive means TRUE)
+Weighted Score: {weighted_score}
 Source Priority: {source_priority}
 Consensus: {consensus}
 Zombie Rumor Check: {zombie_check}
 
-CRITICAL RULES:
-1. If weighted_score is between -0.5 and 0.5, return "Needs Verification"
-2. If no labeled evidence matches the claim, return "Unverified"
-3. Only return "True" if weighted_score >= 0.7 AND multiple sources agree
-4. Only return "False" if weighted_score <= -0.7 AND multiple sources agree
-5. A claim being similar to TRUE news does NOT make it true
+VERIFICATION STEPS:
+1. TOPIC CHECK: Is evidence about the same topic/subject as the claim? If NO → return "Unverified"
+2. If evidence is relevant, check if sources agree
+3. Only return "True" if there is MATCHING evidence about the EXACT same event
+4. Default to "Needs Verification" if uncertain
 
-OUTPUT FORMAT (use exactly this format):
+OUTPUT FORMAT:
 
+TOPIC_MATCH: [Yes / No] - Are the evidence pieces about the same topic as the claim?
 VERDICT: [True / False / Misleading / Needs Verification / Unverified]
 CONFIDENCE: [0 to 100] percent
-REASONING: [2 to 3 sentences explaining your decision]
-CITATIONS: [List the sources you used]
+REASONING: [Explain your topic relevance check and decision]
+CITATIONS: [List sources, or "None relevant" if topic mismatch]
 
-Now analyze:'''
+Analyze now:'''
 
     # Few shot example template
     FEW_SHOT_TEMPLATE = '''
@@ -210,11 +221,16 @@ Verdict: {label}
         confidence = 50
         reasoning = ""
         citations = []
+        topic_match = True  # Default to true
         
         for line in lines:
             line_lower = line.lower().strip()
             
-            if line_lower.startswith("verdict:"):
+            if line_lower.startswith("topic_match:"):
+                topic_text = line.split(":", 1)[1].strip().lower()
+                topic_match = "yes" in topic_text
+            
+            elif line_lower.startswith("verdict:"):
                 verdict_text = line.split(":", 1)[1].strip().lower()
                 verdict = self._normalize_verdict(verdict_text)
             
@@ -232,11 +248,19 @@ Verdict: {label}
                 citations_text = line.split(":", 1)[1].strip()
                 citations = [c.strip() for c in citations_text.split(",")]
         
+        # CRITICAL: If topic doesn't match, force unverified
+        if not topic_match:
+            print("[CoTReasoner] Topic mismatch detected - forcing unverified")
+            verdict = "unverified"
+            confidence = 30
+            reasoning = "Evidence is about a different topic than the claim. " + reasoning
+        
         return {
             "verdict": verdict,
             "confidence": confidence / 100,
             "reasoning": reasoning,
             "citations": citations,
+            "topic_match": topic_match,
             "raw_response": response
         }
     
