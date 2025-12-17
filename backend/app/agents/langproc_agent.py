@@ -2,18 +2,16 @@
 langproc_agent.py
 
 Language Processing Agent.
-Generates embeddings for text using multiple providers:
+Generates embeddings for text using:
 1. OpenRouter API (primary)
 2. Pinecone Inference API (fallback)
-3. Sentence Transformers (local fallback)
 
 Uses multilingual e5 large model which supports Sinhala (1024 dimensions).
 Caches embeddings in Redis for faster retrieval.
 """
 import requests
 import numpy as np
-from typing import List, Optional
-from tenacity import retry, stop_after_attempt, wait_exponential
+from typing import Optional
 
 from ..config import get_settings
 from ..store.memory_store import get_memory_manager
@@ -22,7 +20,7 @@ from ..store.memory_store import get_memory_manager
 class LangProcAgent:
     """
     Agent for generating text embeddings.
-    Uses multiple embedding providers with fallback support.
+    Uses OpenRouter and Pinecone embedding providers with fallback support.
     Caches embeddings in Redis for reuse.
     """
     
@@ -48,10 +46,7 @@ class LangProcAgent:
         # Memory manager for caching
         self.memory = None
         
-        # Sentence Transformer model (lazy loaded)
-        self._local_model = None
-        
-        # Get configured provider (auto, openrouter, pinecone, local)
+        # Get configured provider (auto, openrouter, pinecone)
         configured_provider = settings.EMBEDDING_PROVIDER.lower()
         
         # Set initial provider based on config
@@ -74,27 +69,12 @@ class LangProcAgent:
             except:
                 pass
         return self.memory
-    
-    def _get_local_model(self):
-        """Lazy load sentence transformers model."""
-        if self._local_model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-                print("[LangProcAgent] Loading local model: paraphrase-multilingual-mpnet-base-v2")
-                self._local_model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')
-            except ImportError:
-                print("[LangProcAgent] sentence-transformers not installed")
-                return None
-            except Exception as e:
-                print(f"[LangProcAgent] Failed to load local model: {e}")
-                return None
-        return self._local_model
 
     def get_embeddings(self, text: str) -> np.ndarray:
         """
         Get embedding vector for text.
         Returns numpy array with specified dimensions.
-        Tries multiple providers with fallback.
+        Tries providers with fallback if configured.
         """
         print("[LangProcAgent] Embedding text:", text[:50])
         
@@ -120,14 +100,8 @@ class LangProcAgent:
         if self._provider == "pinecone" and embedding is None:
             if self.pinecone_key:
                 embedding = self._try_pinecone(text)
-            if embedding is None and self._auto_fallback:
-                print("[LangProcAgent] Pinecone failed, switching to local model")
-                self._provider = "local"
         
-        if self._provider == "local" and embedding is None:
-            embedding = self._try_local(text)
-        
-        # 4. Last resort: random embedding
+        # Last resort: random embedding
         if embedding is None:
             print("[LangProcAgent] All providers failed, using random embedding")
             return np.random.rand(self.dimension).astype('float32')
@@ -203,30 +177,6 @@ class LangProcAgent:
                 
         except Exception as e:
             print(f"[LangProcAgent] Pinecone exception: {e}")
-        
-        return None
-    
-    def _try_local(self, text: str) -> Optional[np.ndarray]:
-        """Try to get embedding from local sentence transformer."""
-        try:
-            model = self._get_local_model()
-            if model is None:
-                return None
-            
-            embedding = model.encode(text, convert_to_numpy=True)
-            print(f"[LangProcAgent] Local: Got embedding, dim: {len(embedding)}")
-            
-            # Pad or truncate to match expected dimension
-            if len(embedding) < self.dimension:
-                padding = np.zeros(self.dimension - len(embedding))
-                embedding = np.concatenate([embedding, padding])
-            elif len(embedding) > self.dimension:
-                embedding = embedding[:self.dimension]
-            
-            return embedding.astype('float32')
-            
-        except Exception as e:
-            print(f"[LangProcAgent] Local exception: {e}")
         
         return None
 

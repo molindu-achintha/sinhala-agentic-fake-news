@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     PINECONE_INDEX_NAME: str = "news-store"
     
     # Embedding Configuration
-    # EMBEDDING_PROVIDER options: "openrouter", "pinecone", "local", "auto"
-    # "auto" = try openrouter first, then pinecone, then local
+    # EMBEDDING_PROVIDER options: "openrouter", "pinecone", "auto"
+    # "auto" = try openrouter first, then pinecone
     EMBEDDING_PROVIDER: str = "auto"
     
     # Embedding Model (via OpenRouter)
