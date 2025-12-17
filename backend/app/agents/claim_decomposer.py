@@ -9,9 +9,12 @@ from datetime import datetime
 from typing import Dict, List
 
 
+from deep_translator import GoogleTranslator
+
 class ClaimDecomposer:
     """
     Decomposes claims into searchable components.
+    Capable of translating Sinhala to English for broader search coverage.
     """
     
     # Keywords indicating recent events
@@ -29,6 +32,7 @@ class ClaimDecomposer:
     def __init__(self):
         """Initialize decomposer."""
         print("[ClaimDecomposer] Initialized")
+        self.translator = GoogleTranslator(source='auto', target='en')
     
     def decompose(self, claim: str) -> Dict:
         """
@@ -51,17 +55,39 @@ class ClaimDecomposer:
         # Extract keywords for search
         keywords = self._extract_keywords(claim)
         
+        # Translate to English if Sinhala detected
+        english_claim = claim
+        english_keywords = keywords
+        english_web_query = ""
+        
+        try:
+            # Check if claim contains Sinhala (Unicode range 0D80-0DFF)
+            if re.search(r'[\u0D80-\u0DFF]', claim):
+                print("[ClaimDecomposer] Translating to English...")
+                english_claim = self.translator.translate(claim)
+                print("[ClaimDecomposer] Translated:", english_claim)
+                
+                # Extract English keywords
+                english_keywords = self._extract_keywords(english_claim)
+                english_web_query = " ".join(english_keywords[:7])
+        except Exception as e:
+            print(f"[ClaimDecomposer] Translation failed: {e}")
+            english_web_query = ""
+        
         # Generate search queries
         vector_query = self._create_vector_query(claim, keywords)
         web_query = self._create_web_query(claim, keywords)
         
         result = {
             "original_claim": claim,
+            "translated_claim": english_claim,
             "keywords": keywords,
+            "english_keywords": english_keywords,
             "years": years,
             "temporal_type": temporal_type,
             "vector_query": vector_query,
             "web_query": web_query,
+            "english_web_query": english_web_query,
             "needs_web_search": temporal_type == "recent"
         }
         
