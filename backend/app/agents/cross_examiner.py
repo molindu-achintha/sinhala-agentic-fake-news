@@ -69,7 +69,7 @@ class CrossExaminer:
         label_analysis = self._analyze_labels(labeled)
         
         # Step 3: Check for zombie rumors
-        zombie_check = self._check_zombie_rumors(labeled)
+        zombie_check = self._check_zombie_rumors(labeled, decomposed)
         
         # Step 4: Determine consensus
         consensus = self._determine_consensus(label_analysis, web_results)
@@ -204,20 +204,45 @@ class CrossExaminer:
             "false_count": label_counts.get("false", 0) + label_counts.get("fake", 0)
         }
     
-    def _check_zombie_rumors(self, labeled: List[Dict]) -> Dict:
-        """Check if this is a known recurring fake news zombie rumor."""
+    def _check_zombie_rumors(self, labeled: List[Dict], decomposed: Dict) -> Dict:
+        """
+        Check for zombie rumors (recycled old news).
+        Condition 1: Known recurring false claim (high similarity match)
+        Condition 2: Old TRUE news being shared as RECENT news
+        """
+        current_year = datetime.now().year
+        temporal_type = decomposed.get("temporal_type", "general")
+        claim_years = decomposed.get("years", [])
+        
         for doc in labeled:
             label = doc.get("label", "").lower()
             similarity = doc.get("score", 0)
+            text = doc.get("text", "")
             
-            # High similarity match with known FALSE label
+            # Condition 1: Known recurring false claim
             if label in ["false", "fake"] and similarity >= 0.90:
                 return {
                     "is_zombie": True,
-                    "matched_claim": doc.get("text", "")[:100],
-                    "original_source": doc.get("source", ""),
-                    "message": "This appears to be a known recurring false claim"
+                    "type": "known_false",
+                    "matched_claim": text[:100],
+                    "message": "This is a known recurring false claim"
                 }
+            
+            # Condition 2: Recycled old news
+            # If claim is "recent" but matches old "true" news
+            if temporal_type == "recent" and label in ["true", "real"] and similarity >= 0.85:
+                # Check for old years in evidence text
+                doc_years = [int(y) for y in re.findall(r'\b(20[1-2][0-9])\b', text)]
+                if doc_years:
+                    old_year = max(doc_years)
+                    # If evidence is > 1 year old
+                    if old_year < current_year - 1:
+                         return {
+                            "is_zombie": True,
+                            "type": "recycled_news",
+                            "matched_claim": text[:100],
+                            "message": f"Old news from {old_year} being shared as new"
+                        }
         
         return {"is_zombie": False}
     

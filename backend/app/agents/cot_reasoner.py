@@ -47,11 +47,32 @@ Source Priority: {source_priority}
 Consensus: {consensus}
 Zombie Rumor Check: {zombie_check}
 
+VERIFICATION CHECKLIST (You must perform these checks):
+
+1. TOPIC CHECK: 
+   - Is evidence about the SAME event? (e.g. Cricket != Trains)
+   - If NO, stop and return "Unverified".
+
+2. DATE CHECK (Zombie Rumor Detection):
+   - Check the dates in the evidence vs the claim.
+   - Is the claim recycling an old event as "new"?
+   - If evidence is from 2019 but claim says "today", it is MISLEADING/FALSE.
+
+3. SOURCE CHECK:
+   - Are the sources reputable news outlets (e.g. Adaderana, BBC, Lankadeepa)?
+   - Or are they random social media posts?
+   - Give less weight to random sources.
+
+4. LOGIC CHECK:
+   - Does the evidence *actually* prove the claim, or just mention similar keywords?
+   - "Government discussing fuel" does NOT prove "Fuel price increased".
+
 VERIFICATION STEPS:
-1. TOPIC CHECK: Is evidence about the same topic/subject as the claim? If NO → return "Unverified"
-2. If evidence is relevant, check if sources agree
-3. Only return "True" if there is MATCHING evidence about the EXACT same event
-4. Default to "Needs Verification" if uncertain
+1. Run Topic Check. If fail -> Unverified.
+2. Run Date Check. If fail -> Misleading/False.
+3. Check if reliable sources confirm the specific details.
+4. If sources conflict -> Needs Verification.
+5. If score is high but topic mismatch -> Unverified.
 
 OUTPUT FORMAT:
 
