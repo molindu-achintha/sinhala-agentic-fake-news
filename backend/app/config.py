@@ -44,7 +44,10 @@ class Settings(BaseSettings):
 
     class Config:
         """Configuration for settings loading."""
-        env_file = "../.env"
+        # Use absolute path to find .env in project root
+        from pathlib import Path
+        _config_file = Path(__file__).resolve().parent.parent.parent / ".env"
+        env_file = str(_config_file)
         env_file_encoding = "utf-8"
         extra = "ignore" # Ignore extra fields in .env
 
