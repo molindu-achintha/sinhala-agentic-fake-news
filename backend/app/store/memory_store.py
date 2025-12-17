@@ -38,16 +38,29 @@ class ShortTermMemory:
     
     def __init__(self):
         """Initialize Redis connection."""
-        self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.redis_url = os.getenv("REDIS_URL")
+        self.redis_host = os.getenv("REDIS_HOST", "localhost")
+        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        self.redis_password = os.getenv("REDIS_PASSWORD", "")
         self.ttl = 3600  # 1 hour default
         self.client = None
         self.fallback_cache = {}  # In memory fallback
         
         if REDIS_AVAILABLE:
             try:
-                self.client = redis.from_url(self.redis_url)
+                # Try URL first
+                if self.redis_url:
+                    self.client = redis.from_url(self.redis_url, decode_responses=True)
+                else:
+                    # Use host/port/password
+                    self.client = redis.Redis(
+                        host=self.redis_host,
+                        port=self.redis_port,
+                        password=self.redis_password if self.redis_password else None,
+                        decode_responses=True
+                    )
                 self.client.ping()
-                print("[ShortTermMemory] Redis connected:", self.redis_url)
+                print("[ShortTermMemory] Redis connected")
             except Exception as e:
                 print("[ShortTermMemory] Redis connection failed:", str(e))
                 self.client = None
