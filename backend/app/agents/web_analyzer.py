@@ -320,10 +320,13 @@ class WebAnalyzer:
         
         negation_patterns = [
             r"not\s+\w*\s*" + word for word in claim_words[:3]
-        ] + [
-            r"is\s+not", r"are\s+not", r"was\s+not",
-            r"never\s+\w*\s*" + word for word in claim_words[:2]
         ]
+        negation_patterns.extend([
+            r"is\s+not", r"are\s+not", r"was\s+not"
+        ])
+        negation_patterns.extend([
+            r"never\s+\w*\s*" + word for word in claim_words[:2]
+        ])
         
         for pattern in negation_patterns:
             if re.search(pattern, evidence, re.IGNORECASE):
