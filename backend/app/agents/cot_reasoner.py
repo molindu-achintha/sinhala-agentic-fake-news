@@ -183,6 +183,18 @@ Verdict: {label}
             zombie_check=cross_exam.get("zombie_check", {}).get("message", "Not detected")
         )
         
+        # Special instruction for Web Search Fallback
+        recommendation = cross_exam.get("recommendation")
+        if recommendation == "check_web":
+            prompt += """\n
+IMPORTANT INSTRUCTION:
+No pre-verified labeled evidence was found database. 
+However, WEB SEARCH results are available in 'UNLABELED CONTEXT'.
+Please verify the claim using ONLY the information in 'UNLABELED CONTEXT'.
+If the web search results clearly confirm or debunk the claim, issue a verdict based on that.
+IGNORE the "Labels" section as it is empty. Focus on content analysis of the web results.
+"""
+        
         if few_shot:
             prompt = "EXAMPLES:\n" + few_shot + "\n\n" + prompt
         

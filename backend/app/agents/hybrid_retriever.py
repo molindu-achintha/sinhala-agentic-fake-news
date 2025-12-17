@@ -18,9 +18,10 @@ class HybridRetriever:
     """
     
     # Similarity thresholds
-    HIGH_SIMILARITY = 0.90
-    MEDIUM_SIMILARITY = 0.70
-    LOW_SIMILARITY = 0.50
+    # Similarity thresholds
+    HIGH_SIMILARITY = 0.92
+    MEDIUM_SIMILARITY = 0.80
+    LOW_SIMILARITY = 0.75
     
     def __init__(self):
         """Initialize retriever with stores."""

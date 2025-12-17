@@ -21,10 +21,47 @@ class CrossExaminer:
         "Ada Derana": 0.9,
         "Lankadeepa": 0.9,
         "ITN News": 0.8,
+        "Web Source": 0.8, # Trusted web search
         "Twitter": 0.5,
         "Facebook": 0.4,
         "unknown": 0.3
     }
+    
+    # ... (LABEL_SCORES remain same) ...
+
+    def _calculate_weighted_score(
+        self, 
+        labeled: List[Dict], 
+        unlabeled: List[Dict]
+    ) -> float:
+        """Calculate weighted evidence score."""
+        total_score = 0
+        total_weight = 0
+        
+        # Labeled evidence high weight
+        for doc in labeled:
+            label = doc.get("label", "").lower()
+            similarity = doc.get("score", 0.5)
+            source = doc.get("source", "unknown")
+            
+            label_score = self.LABEL_SCORES.get(label, 0)
+            source_weight = self.SOURCE_WEIGHTS.get(source, 0.3)
+            
+            weight = similarity * source_weight
+            total_score += label_score * weight
+            total_weight += weight
+            
+        # Unlabeled/Web evidence (contributes to confidence, not direction)
+        for doc in unlabeled:
+            similarity = doc.get("score", 0)
+            if similarity > 0.75:
+                # Good web match increases confidence that we have info
+                total_weight += 0.2
+        
+        if total_weight == 0:
+            return 0
+            
+        return total_score / total_weight
     
     # Label weights for scoring
     LABEL_SCORES = {
@@ -365,17 +402,26 @@ class CrossExaminer:
             else:
                 return "needs_verification"
         
-        # MEDIUM similarity - be more cautious
+        # MEDIUM similarity
         elif similarity_level == "medium":
             if support_score >= 0.6:
                 return "likely_true"
             elif support_score <= -0.6:
                 return "likely_false"
+            elif zombie_check.get("has_zombie_risk"): # Check zombie risk explicitly
+                 return "misleading"
             else:
+                # If we have web results but no labeled evidence
+                if not label_analysis.get("has_labels"):
+                    return "check_web"
                 return "needs_verification"
         
-        # LOW or NO similarity - cannot verify
-        return "unverified"
+        # LOW or NO similarity
+        else:
+            # If we have web results found (even with low vector match)
+            if not label_analysis.get("has_labels"):
+                return "check_web"
+            return "unverified"
     
     def _calculate_confidence(self, label_analysis: Dict, evidence: Dict) -> float:
         """Calculate confidence in recommendation."""
