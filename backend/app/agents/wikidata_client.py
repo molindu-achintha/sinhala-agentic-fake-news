@@ -213,15 +213,33 @@ class WikidataClient:
         
         return ClaimType.UNKNOWN
     
+    # Additional entity classes for generic queries
+    ENTITY_CLASSES = {
+        "river": "Q4022",
+        "animal": "Q729",
+        "country": "Q6256",
+        "city": "Q515",
+        "mountain": "Q8502",
+        "planet": "Q634",
+        "star": "Q523",
+        "building": "Q41176",
+        "island": "Q23442"
+    }
+
     def _extract_entity(self, claim: str) -> Optional[str]:
-        """Extract the main entity (e.g., country) from the claim."""
+        """Extract the main entity from the claim."""
         claim_lower = claim.lower()
         
-        # Check for known countries
+        # 1. Check for specific countries first (Highest priority)
         for country, entity_id in self.COUNTRY_ENTITIES.items():
             if country in claim_lower:
                 return country
-        
+                
+        # 2. Check for generic entity classes (for 'largest', 'longest' queries)
+        for entity_class, entity_id in self.ENTITY_CLASSES.items():
+            if entity_class in claim_lower:
+                return entity_id  # Return ID directly for classes
+                
         return None
     
     def _query_wikidata(self, claim_type: ClaimType, entity: str) -> Optional[str]:
@@ -229,7 +247,12 @@ class WikidataClient:
         if claim_type not in self.SPARQL_TEMPLATES:
             return None
         
+        # Determine Entity ID
+        # If it's a known country name, get ID. If it looks like Q-ID, use as is.
         entity_id = self.COUNTRY_ENTITIES.get(entity.lower())
+        if not entity_id and entity.startswith("Q"):
+            entity_id = entity
+            
         if not entity_id:
             return None
         
