@@ -171,4 +171,3 @@ class HybridRetriever:
             print(f"[HybridRetriever] DDGS Error: {e}")
             
         return results
-```
