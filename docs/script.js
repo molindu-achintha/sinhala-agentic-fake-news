@@ -6,6 +6,7 @@
  */
 
 // Backend API URL - Change this for production
+// const API_BASE = window.API_BASE || 'https://sinhala-agentic-fake-news.onrender.com';
 const API_BASE = 'https://sinhala-agentic-fake-news.onrender.com';
 
 // Status display element
