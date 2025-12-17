@@ -155,29 +155,54 @@ class CrossExaminer:
     def _check_topic_relevance(self, decomposed: Dict, labeled: List[Dict]) -> Dict:
         """
         Check if evidence actually talks about the same topic.
-        Uses simplistic keyword overlap.
+        Uses keyword overlap AND translated claim matching.
         """
-        keywords = set(k.lower() for k in decomposed.get("keywords", []))
-        if not keywords or not labeled:
-            return {"is_relevant": True, "overlap_ratio": 1.0}  # Default to trust if no keywords
+        # Get both Sinhala and English keywords
+        sinhala_keywords = set(k.lower() for k in decomposed.get("keywords", []))
+        english_keywords = set(k.lower() for k in decomposed.get("english_keywords", []))
+        translated_claim = decomposed.get("translated_claim", "").lower()
+        
+        # Key entities from translated claim (e.g., "capital", "Colombo", "Sri Lanka")
+        key_entities = set()
+        if translated_claim:
+            # Extract important words from translation
+            import re
+            words = re.findall(r'\b\w{3,}\b', translated_claim)
+            common = {"the", "is", "are", "was", "of", "in", "and", "that", "this", "has", "have", "been"}
+            key_entities = set(w.lower() for w in words if w.lower() not in common)
+        
+        all_keywords = sinhala_keywords | english_keywords | key_entities
+        
+        if not all_keywords or not labeled:
+            return {"is_relevant": True, "overlap_ratio": 1.0, "method": "default"}
             
         max_overlap = 0.0
+        best_match_text = ""
         
         for doc in labeled:
             text = doc.get("text", "").lower()
-            # Simple check: how many keywords appear in text?
-            found = sum(1 for k in keywords if k in text)
-            ratio = found / len(keywords)
-            max_overlap = max(max_overlap, ratio)
+            # Count how many of our keywords appear in this evidence
+            found = sum(1 for k in all_keywords if k in text)
+            ratio = found / len(all_keywords) if all_keywords else 0
             
-        # Threshold: meaningful overlap needed
-        # If overlap is < 20% (e.g. 0 out of 4 keywords), it's likely a topic drift
-        is_relevant = max_overlap >= 0.20
+            if ratio > max_overlap:
+                max_overlap = ratio
+                best_match_text = text[:100]
+            
+        # STRICTER Threshold: Need at least 25% keyword overlap
+        # Or at least 2 matching keywords for short claims
+        min_matches = min(2, len(all_keywords))
+        found_count = int(max_overlap * len(all_keywords))
+        is_relevant = max_overlap >= 0.25 or found_count >= min_matches
+        
+        print(f"[CrossExaminer] Topic check: {found_count}/{len(all_keywords)} keywords matched")
         
         return {
             "is_relevant": is_relevant,
             "overlap_ratio": max_overlap,
-            "keyword_count": len(keywords)
+            "keyword_count": len(all_keywords),
+            "matched_count": found_count,
+            "method": "keyword_overlap"
         }
     
     def _check_date_consistency(self, decomposed: Dict, labeled: List[Dict]) -> Dict:
