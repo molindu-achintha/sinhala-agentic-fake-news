@@ -85,8 +85,28 @@
             color: #00d4ff;
         }
 
-        .test-section {
-            margin-bottom: 30px;
+        .file-upload {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .file-upload:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .file-upload input {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
         }
 
         textarea {
@@ -110,6 +130,7 @@
             font-size: 1rem;
             cursor: pointer;
             margin-top: 15px;
+            margin-right: 10px;
             transition: transform 0.2s;
         }
 
@@ -120,6 +141,11 @@
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .results-table {
@@ -158,6 +184,16 @@
             color: #fff;
         }
 
+        .badge-needs_verification {
+            background: #f59e0b;
+            color: #000;
+        }
+
+        .badge-unverified {
+            background: #6b7280;
+            color: #fff;
+        }
+
         .badge-correct {
             background: #10b981;
             color: #fff;
@@ -168,26 +204,10 @@
             color: #fff;
         }
 
-        .history-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .history-item {
-            padding: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .history-item:last-child {
-            border-bottom: none;
-        }
-
         .memory-indicator {
             display: flex;
-            gap: 20px;
+            gap: 15px;
+            flex-wrap: wrap;
             margin-bottom: 20px;
         }
 
@@ -197,17 +217,25 @@
             font-size: 0.9rem;
         }
 
+        .memory-cookie {
+            background: #f7df1e;
+            color: #000;
+        }
+
         .memory-redis {
             background: #dc382d;
+        }
+
+        .memory-redis.offline {
+            background: #666;
         }
 
         .memory-postgres {
             background: #336791;
         }
 
-        .memory-cookie {
-            background: #f7df1e;
-            color: #000;
+        .memory-postgres.offline {
+            background: #666;
         }
 
         .nav-links {
@@ -220,10 +248,14 @@
         .nav-links a {
             color: #00d4ff;
             text-decoration: none;
+            padding: 8px 20px;
+            border: 1px solid #00d4ff;
+            border-radius: 20px;
         }
 
         .nav-links a:hover {
-            text-decoration: underline;
+            background: #00d4ff;
+            color: #1a1a2e;
         }
 
         .loading {
@@ -232,14 +264,33 @@
             color: #888;
         }
 
-        .chart-placeholder {
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.2);
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 10px;
-            color: #666;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 5px;
+            color: #888;
+        }
+
+        .csv-format {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            margin: 15px 0;
         }
     </style>
 </head>
@@ -271,22 +322,49 @@
                 <div class="stat-label">Accuracy</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="cacheHits">0</div>
-                <div class="stat-label">Cache Hits</div>
+                <div class="stat-value" id="trueCount">0</div>
+                <div class="stat-label">True</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="avgLatency">0ms</div>
-                <div class="stat-label">Avg Latency</div>
+                <div class="stat-value" id="falseCount">0</div>
+                <div class="stat-label">False</div>
             </div>
         </div>
 
-        <div class="card test-section">
-            <h3>Quick Evaluation Test</h3>
-            <textarea id="testInput" placeholder="Enter claims to test, one per line...
-Example:
-ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි|true
-අද රට පුරා ඇදිරි නීතිය පනවා ඇත|false"></textarea>
-            <button id="runTest" onclick="runEvaluation()">Run Evaluation</button>
+        <div class="card">
+            <h3>Upload CSV for Evaluation</h3>
+            <p style="color: #888; margin-bottom: 15px;">Upload a CSV file with claims to evaluate. Format: text,label
+                (one per line)</p>
+
+            <div class="csv-format">
+                <strong>Expected CSV Format:</strong><br>
+                text,label<br>
+                "ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි",true<br>
+                "අද සිට ඉන්ධන මිල අඩු වේ",false
+            </div>
+
+            <div class="file-upload" onclick="document.getElementById('csvFile').click()">
+                <div class="file-upload-icon">📁</div>
+                <p>Click to upload CSV file</p>
+                <p style="color: #666; font-size: 0.9rem;">or drag and drop</p>
+                <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(event)">
+            </div>
+
+            <div id="fileInfo" style="display: none; margin-bottom: 15px;">
+                <p>File: <span id="fileName"></span></p>
+                <p>Rows: <span id="rowCount"></span></p>
+            </div>
+
+            <button id="runEvalBtn" onclick="runCSVEvaluation()" disabled>Run Evaluation</button>
+            <button class="secondary" onclick="downloadSampleCSV()">Download Sample CSV</button>
+        </div>
+
+        <div class="card" id="progressCard" style="display: none;">
+            <h3>Evaluation Progress</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <p class="progress-text" id="progressText">0 / 0 claims processed</p>
         </div>
 
         <div class="card">
@@ -298,254 +376,302 @@ Example:
                         <th>Expected</th>
                         <th>Predicted</th>
                         <th>Result</th>
-                        <th>Latency</th>
+                        <th>Confidence</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody">
                     <tr>
-                        <td colspan="5" class="loading">Run an evaluation to see results</td>
+                        <td colspan="5" class="loading">Upload a CSV file to see results</td>
                     </tr>
                 </tbody>
             </table>
+            <button class="secondary" onclick="exportResults()" id="exportBtn" style="display: none;">Export Results as
+                CSV</button>
         </div>
 
         <div class="card">
-            <h3>Session History (Cookies)</h3>
-            <div class="history-list" id="historyList">
-                <p class="loading">No history yet</p>
-            </div>
-            <button onclick="clearHistory()">Clear History</button>
-        </div>
-
-        <div class="card">
-            <h3>Memory Statistics</h3>
-            <div id="memoryStats" class="loading">Loading memory stats...</div>
+            <h3>Quick Manual Test</h3>
+            <textarea id="testInput" placeholder="Enter claims manually, one per line with format: claim|expected_label
+Example:
+ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි|true
+අද රට පුරා ඇදිරි නීතිය පනවා ඇත|false"></textarea>
+            <button onclick="runManualTest()">Run Manual Test</button>
         </div>
     </div>
 
     <script>
         // API Base URL
-        const API_BASE = window.API_BASE || 'https://sinhala-fake-news-api.onrender.com';
+        const API_BASE = window.API_BASE || 'https://sinhala-agentic-fake-news.onrender.com';
 
-        // Cookie utilities
-        const Cookies = {
-            set: function (name, value, days) {
-                let expires = '';
-                if (days) {
-                    const date = new Date();
-                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                    expires = '; expires=' + date.toUTCString();
-                }
-                document.cookie = name + '=' + encodeURIComponent(JSON.stringify(value)) + expires + '; path=/';
-            },
-            get: function (name) {
-                const nameEQ = name + '=';
-                const ca = document.cookie.split(';');
-                for (let i = 0; i < ca.length; i++) {
-                    let c = ca[i];
-                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                    if (c.indexOf(nameEQ) === 0) {
-                        try {
-                            return JSON.parse(decodeURIComponent(c.substring(nameEQ.length, c.length)));
-                        } catch {
-                            return null;
-                        }
+        // Store CSV data and results
+        let csvData = [];
+        let evaluationResults = [];
+        let stats = { total: 0, correct: 0, trueCount: 0, falseCount: 0 };
+
+        // Handle CSV file upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const text = e.target.result;
+                parseCSV(text);
+            };
+            reader.readAsText(file);
+        }
+
+        // Parse CSV content
+        function parseCSV(text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            csvData = [];
+
+            // Skip header if present
+            let startIndex = 0;
+            if (lines[0].toLowerCase().includes('text') || lines[0].toLowerCase().includes('label')) {
+                startIndex = 1;
+            }
+
+            for (let i = startIndex; i < lines.length; i++) {
+                const line = lines[i];
+                // Handle CSV with quotes
+                let match = line.match(/"([^"]+)",\s*(\w+)/);
+                if (match) {
+                    csvData.push({ text: match[1], label: match[2].toLowerCase() });
+                } else {
+                    // Simple comma split
+                    const parts = line.split(',');
+                    if (parts.length >= 2) {
+                        csvData.push({
+                            text: parts.slice(0, -1).join(',').replace(/"/g, '').trim(),
+                            label: parts[parts.length - 1].trim().toLowerCase()
+                        });
                     }
                 }
-                return null;
-            },
-            delete: function (name) {
-                document.cookie = name + '=; Max-Age=-99999999; path=/';
             }
-        };
 
-        // Session storage for quick access
-        const SessionMemory = {
-            history: [],
-            stats: {
-                total: 0,
-                correct: 0,
-                cacheHits: 0,
-                totalLatency: 0
-            },
+            document.getElementById('rowCount').textContent = csvData.length;
+            document.getElementById('fileInfo').style.display = 'block';
+            document.getElementById('runEvalBtn').disabled = csvData.length === 0;
 
-            load: function () {
-                const saved = Cookies.get('eval_session');
-                if (saved) {
-                    this.history = saved.history || [];
-                    this.stats = saved.stats || this.stats;
-                }
-                this.updateUI();
-            },
+            console.log('[CSV] Parsed', csvData.length, 'rows');
+        }
 
-            save: function () {
-                Cookies.set('eval_session', {
-                    history: this.history.slice(-50),
-                    stats: this.stats
-                }, 7);
-            },
-
-            addResult: function (claim, expected, predicted, latency, fromCache) {
-                const correct = expected === predicted;
-                this.history.unshift({
-                    claim: claim.substring(0, 50),
-                    expected,
-                    predicted,
-                    correct,
-                    latency,
-                    fromCache,
-                    timestamp: new Date().toISOString()
-                });
-
-                this.stats.total++;
-                if (correct) this.stats.correct++;
-                if (fromCache) this.stats.cacheHits++;
-                this.stats.totalLatency += latency;
-
-                this.save();
-                this.updateUI();
-            },
-
-            updateUI: function () {
-                document.getElementById('totalVerified').textContent = this.stats.total;
-                document.getElementById('accuracy').textContent =
-                    this.stats.total > 0 ? Math.round((this.stats.correct / this.stats.total) * 100) + '%' : '0%';
-                document.getElementById('cacheHits').textContent = this.stats.cacheHits;
-                document.getElementById('avgLatency').textContent =
-                    this.stats.total > 0 ? Math.round(this.stats.totalLatency / this.stats.total) + 'ms' : '0ms';
-
-                this.renderHistory();
-            },
-
-            renderHistory: function () {
-                const list = document.getElementById('historyList');
-                if (this.history.length === 0) {
-                    list.innerHTML = '<p class="loading">No history yet</p>';
-                    return;
-                }
-
-                list.innerHTML = this.history.slice(0, 20).map(item =>
-                    '<div class="history-item">' +
-                    '<span>' + item.claim + '...</span>' +
-                    '<span class="badge badge-' + (item.correct ? 'correct' : 'incorrect') + '">' +
-                    (item.correct ? 'Correct' : 'Incorrect') +
-                    '</span>' +
-                    '</div>'
-                ).join('');
-            },
-
-            clear: function () {
-                this.history = [];
-                this.stats = { total: 0, correct: 0, cacheHits: 0, totalLatency: 0 };
-                Cookies.delete('eval_session');
-                this.updateUI();
-            }
-        };
-
-        // Run evaluation
-        async function runEvaluation() {
-            const input = document.getElementById('testInput').value.trim();
-            if (!input) {
-                alert('Please enter test claims');
+        // Run evaluation on CSV data
+        async function runCSVEvaluation() {
+            if (csvData.length === 0) {
+                alert('Please upload a CSV file first');
                 return;
             }
 
-            const lines = input.split('\n').filter(l => l.trim());
-            const tests = lines.map(line => {
-                const [text, expected] = line.split('|');
-                return { text: text.trim(), expected: (expected || 'unknown').trim() };
-            });
+            document.getElementById('runEvalBtn').disabled = true;
+            document.getElementById('progressCard').style.display = 'block';
+
+            evaluationResults = [];
+            stats = { total: 0, correct: 0, trueCount: 0, falseCount: 0 };
 
             const resultsBody = document.getElementById('resultsBody');
-            resultsBody.innerHTML = '<tr><td colspan="5" class="loading">Running evaluation...</td></tr>';
+            resultsBody.innerHTML = '';
 
-            const results = [];
+            for (let i = 0; i < csvData.length; i++) {
+                const item = csvData[i];
+                updateProgress(i, csvData.length);
 
-            for (const test of tests) {
-                const startTime = Date.now();
                 try {
                     const response = await fetch(API_BASE + '/v1/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: test.text })
+                        body: JSON.stringify({ text: item.text })
                     });
 
                     const data = await response.json();
-                    const latency = Date.now() - startTime;
-                    const predicted = data.verdict?.label || 'unknown';
-                    const fromCache = data.from_cache || false;
+                    const predicted = (data.verdict?.label || 'unverified').toLowerCase();
+                    const confidence = data.verdict?.confidence || 0;
+                    const isCorrect = normalizeLabel(predicted) === normalizeLabel(item.label);
 
-                    results.push({
-                        claim: test.text,
-                        expected: test.expected,
-                        predicted,
-                        correct: test.expected === predicted,
-                        latency,
-                        fromCache
-                    });
+                    stats.total++;
+                    if (isCorrect) stats.correct++;
+                    if (predicted === 'true' || predicted === 'likely_true') stats.trueCount++;
+                    if (predicted === 'false' || predicted === 'likely_false') stats.falseCount++;
 
-                    SessionMemory.addResult(test.text, test.expected, predicted, latency, fromCache);
+                    const result = {
+                        text: item.text,
+                        expected: item.label,
+                        predicted: predicted,
+                        correct: isCorrect,
+                        confidence: confidence
+                    };
+
+                    evaluationResults.push(result);
+                    addResultRow(result);
 
                 } catch (error) {
-                    results.push({
-                        claim: test.text,
-                        expected: test.expected,
+                    console.error('Error:', error);
+                    evaluationResults.push({
+                        text: item.text,
+                        expected: item.label,
                         predicted: 'error',
                         correct: false,
-                        latency: Date.now() - startTime,
+                        confidence: 0,
                         error: error.message
                     });
                 }
+
+                updateStats();
+
+                // Small delay to avoid rate limiting
+                await new Promise(r => setTimeout(r, 200));
             }
 
-            renderResults(results);
+            updateProgress(csvData.length, csvData.length);
+            document.getElementById('runEvalBtn').disabled = false;
+            document.getElementById('exportBtn').style.display = 'inline-block';
+
+            // Save to cookies
+            saveSession();
         }
 
-        function renderResults(results) {
+        function normalizeLabel(label) {
+            label = label.toLowerCase();
+            if (label === 'true' || label === 'likely_true' || label === 'real') return 'true';
+            if (label === 'false' || label === 'likely_false' || label === 'fake') return 'false';
+            return label;
+        }
+
+        function updateProgress(current, total) {
+            const percent = Math.round((current / total) * 100);
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = current + ' / ' + total + ' claims processed';
+        }
+
+        function addResultRow(result) {
             const tbody = document.getElementById('resultsBody');
-            tbody.innerHTML = results.map(r =>
-                '<tr>' +
-                '<td>' + r.claim.substring(0, 40) + '...</td>' +
-                '<td><span class="badge badge-' + r.expected + '">' + r.expected + '</span></td>' +
-                '<td><span class="badge badge-' + r.predicted + '">' + r.predicted + '</span></td>' +
-                '<td><span class="badge badge-' + (r.correct ? 'correct' : 'incorrect') + '">' +
-                (r.correct ? 'Correct' : 'Wrong') + '</span></td>' +
-                '<td>' + r.latency + 'ms' + (r.fromCache ? ' (cached)' : '') + '</td>' +
-                '</tr>'
-            ).join('');
+            const row = document.createElement('tr');
+            row.innerHTML =
+                '<td>' + (result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')) + '</td>' +
+                '<td><span class="badge badge-' + result.expected + '">' + result.expected + '</span></td>' +
+                '<td><span class="badge badge-' + result.predicted + '">' + result.predicted + '</span></td>' +
+                '<td><span class="badge badge-' + (result.correct ? 'correct' : 'incorrect') + '">' +
+                (result.correct ? 'Correct' : 'Wrong') + '</span></td>' +
+                '<td>' + Math.round(result.confidence * 100) + '%</td>';
+            tbody.appendChild(row);
         }
 
-        function clearHistory() {
-            if (confirm('Clear all session history?')) {
-                SessionMemory.clear();
+        function updateStats() {
+            document.getElementById('totalVerified').textContent = stats.total;
+            document.getElementById('accuracy').textContent =
+                stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) + '%' : '0%';
+            document.getElementById('trueCount').textContent = stats.trueCount;
+            document.getElementById('falseCount').textContent = stats.falseCount;
+        }
+
+        function exportResults() {
+            if (evaluationResults.length === 0) return;
+
+            let csv = 'text,expected,predicted,correct,confidence\n';
+            for (const r of evaluationResults) {
+                csv += '"' + r.text.replace(/"/g, '""') + '",' +
+                    r.expected + ',' + r.predicted + ',' +
+                    r.correct + ',' + r.confidence + '\n';
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'evaluation_results_' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+        }
+
+        function downloadSampleCSV() {
+            const sample = 'text,label\n' +
+                '"ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි",true\n' +
+                '"අද සිට ඉන්ධන මිල දෙගුණයක් වේ",false\n' +
+                '"කොළඹ තුළ නව දුම්රිය මාර්ගයක් ඉදි කෙරේ",needs_verification\n';
+
+            const blob = new Blob([sample], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sample_evaluation.csv';
+            a.click();
+        }
+
+        async function runManualTest() {
+            const input = document.getElementById('testInput').value.trim();
+            if (!input) return;
+
+            csvData = [];
+            const lines = input.split('\n').filter(l => l.trim());
+            for (const line of lines) {
+                const [text, label] = line.split('|');
+                if (text && label) {
+                    csvData.push({ text: text.trim(), label: label.trim().toLowerCase() });
+                }
+            }
+
+            if (csvData.length > 0) {
+                document.getElementById('rowCount').textContent = csvData.length;
+                document.getElementById('fileInfo').style.display = 'block';
+                await runCSVEvaluation();
             }
         }
 
-        // Check backend status
+        function saveSession() {
+            const session = { stats, results: evaluationResults.slice(-50) };
+            document.cookie = 'eval_session=' + encodeURIComponent(JSON.stringify(session)) + '; max-age=604800; path=/';
+        }
+
+        function loadSession() {
+            const match = document.cookie.match(/eval_session=([^;]+)/);
+            if (match) {
+                try {
+                    const session = JSON.parse(decodeURIComponent(match[1]));
+                    stats = session.stats || stats;
+                    updateStats();
+                } catch (e) { }
+            }
+        }
+
         async function checkBackendStatus() {
             try {
                 const response = await fetch(API_BASE + '/v1/health');
                 const data = await response.json();
 
-                document.getElementById('redisStatus').textContent = 'Redis: ' + (data.redis || 'Unknown');
-                document.getElementById('postgresStatus').textContent = 'PostgreSQL: ' + (data.postgres || 'Unknown');
+                const redisEl = document.getElementById('redisStatus');
+                const pgEl = document.getElementById('postgresStatus');
 
-                if (data.memory_stats) {
-                    document.getElementById('memoryStats').innerHTML =
-                        '<p>Long Term Memory: ' + (data.memory_stats.long_term?.total_claims || 0) + ' claims stored</p>' +
-                        '<p>Short Term Cache: ' + (data.memory_stats.short_term?.type || 'in_memory') + '</p>';
+                if (data.redis === 'connected') {
+                    redisEl.textContent = 'Redis: Online';
+                    redisEl.classList.remove('offline');
+                } else {
+                    redisEl.textContent = 'Redis: ' + (data.redis || 'in_memory');
+                    redisEl.classList.add('offline');
                 }
+
+                if (data.postgres === 'connected') {
+                    pgEl.textContent = 'PostgreSQL: Online';
+                    pgEl.classList.remove('offline');
+                } else {
+                    pgEl.textContent = 'PostgreSQL: ' + (data.postgres || 'in_memory');
+                    pgEl.classList.add('offline');
+                }
+
             } catch (error) {
                 document.getElementById('redisStatus').textContent = 'Redis: Offline';
+                document.getElementById('redisStatus').classList.add('offline');
                 document.getElementById('postgresStatus').textContent = 'PostgreSQL: Offline';
-                document.getElementById('memoryStats').innerHTML = '<p>Backend not available</p>';
+                document.getElementById('postgresStatus').classList.add('offline');
             }
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function () {
             console.log('[Dashboard] Initializing');
-            SessionMemory.load();
+            console.log('[Dashboard] API:', API_BASE);
+            loadSession();
             checkBackendStatus();
         });
     </script>
