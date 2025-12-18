@@ -11,7 +11,7 @@ from .hybrid_retriever import HybridRetriever
 from .cross_examiner import CrossExaminer
 from .cot_reasoner import CoTReasoner
 from .verdict_agent import VerdictAgent
-from .web_analyzer import get_web_analyzer
+from .web_research_agent import get_web_research_agent
 from .wikidata_client import get_wikidata_client
 from ..store.memory_store import get_memory_manager
 
@@ -37,7 +37,8 @@ class HybridVerifier:
         self.examiner = CrossExaminer()
         self.reasoner = CoTReasoner()
         self.verdict_agent = VerdictAgent()
-        self.web_analyzer = get_web_analyzer()
+        # self.web_analyzer = get_web_analyzer()  # DEPRECATED
+        self.research_agent = get_web_research_agent() # NEW V3 Agent
         self.wikidata = get_wikidata_client()
         
         # Initialize memory manager
@@ -47,14 +48,14 @@ class HybridVerifier:
     
     def verify(self, claim: str, use_cache: bool = True) -> Dict:
         """
-        Verify a claim using the full hybrid pipeline.
+        Verify a claim using the hybrid pipeline.
         
         Args:
-            claim: The news claim to verify
-            use_cache: Whether to check cache first
-        
+            claim: The claim text to verify
+            use_cache: Whether to check memory cache
+            
         Returns:
-            Complete verification result
+            Dict containing verdict, confidence, and reasoning
         """
         print("[HybridVerifier] Starting verification")
         print("[HybridVerifier] Claim:", claim[:100])
@@ -86,13 +87,11 @@ class HybridVerifier:
         print("[HybridVerifier] Step 4 Cross examining evidence")
         cross_exam = self.examiner.examine(evidence, decomposed)
         
-        # Step 5: Analyze web evidence (NEW)
-        print("[HybridVerifier] Step 5 Analyzing web evidence")
-        web_analysis = self.web_analyzer.analyze(
-            claim=claim,
-            translated_claim=decomposed.get("translated_claim", claim),
-            keywords=decomposed.get("english_keywords", []),
-            web_results=evidence.get("web_results", [])
+        # Step 5: Deep Web Research (NEW V3)
+        print("[HybridVerifier] Step 5 Running Deep Web Research")
+        web_analysis = self.research_agent.run(
+            claim=decomposed.get("translated_claim", claim),
+            keywords=decomposed.get("english_keywords", [])
         )
         
         # Step 6: Get few shot examples
