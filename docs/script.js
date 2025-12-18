@@ -8,7 +8,7 @@
 // Backend API URL - Change this for production
 // const API_BASE = window.API_BASE || 'https://sinhala-agentic-fake-news.onrender.com';
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000'
+    ? 'https://sinhala-agentic-fake-news.onrender.com'
     : 'https://sinhala-agentic-fake-news.onrender.com';
 
 // Status display element
