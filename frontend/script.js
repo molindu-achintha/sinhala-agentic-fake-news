@@ -112,7 +112,8 @@ function displayResult(result) {
     const label = verdict.label || 'unknown';
     const confidence = verdict.confidence || 0;
     const explanationSi = verdict.explanation_si || '';
-    const explanationEn = verdict.explanation_en || '';
+    const explanationEn = verdict.explanation_en || verdict.detailed_explanation || '';
+    const llmPowered = verdict.llm_powered || false;
 
     // Get evidence info
     const evidence = result.evidence || {};
@@ -133,6 +134,9 @@ function displayResult(result) {
     // Confidence
     html += '<div class="confidence">';
     html += 'Confidence: ' + Math.round(confidence * 100) + '%';
+    if (llmPowered) {
+        html += ' <span style="background: #10b981; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 10px;">🤖 AI Verified</span>';
+    }
     html += '</div>';
 
     // Cache indicator
@@ -140,21 +144,21 @@ function displayResult(result) {
         html += '<div class="cache-indicator">From cache</div>';
     }
 
-    // Explanations
-    html += '<div class="explanations">';
+    // Sinhala explanation (brief)
     if (explanationSi) {
-        html += '<p class="sinhala">' + explanationSi + '</p>';
+        html += '<div style="margin: 15px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px;">';
+        html += '<p class="sinhala" style="font-size: 1.1rem;">' + explanationSi + '</p>';
+        html += '</div>';
     }
-    if (explanationEn) {
-        html += '<p class="english">' + explanationEn + '</p>';
-    }
-    html += '</div>';
 
-    // Evidence summary
-    html += '<div class="evidence-summary">';
-    html += '<p>Evidence found: ' + labeledCount + ' labeled documents</p>';
-    html += '<p>Top similarity: ' + Math.round(topSimilarity * 100) + '%</p>';
+    // Main LLM Reasoning Container (with streaming)
+    html += '<div id="aiReasoningContainer" style="margin-top: 20px; padding: 25px; background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(20,20,40,0.6) 100%); border-radius: 20px; text-align: left; border: 1px solid rgba(0,212,255,0.3);">';
+    html += '<div id="aiReasoningText" style="white-space: pre-wrap; line-height: 1.8; font-size: 1rem; color: #e0e0e0;"></div>';
     html += '</div>';
+    // Evidence summary (collapsed)
+    html += '<details style="margin-top: 15px; color: #888;">';
+    html += '<summary style="cursor: pointer;">Evidence Details (' + labeledCount + ' documents, ' + Math.round(topSimilarity * 100) + '% similarity)</summary>';
+    html += '<div style="padding: 10px;">';
 
     // Citations
     const citations = evidence.citations || [];
@@ -169,23 +173,20 @@ function displayResult(result) {
         html += '</div>';
     }
 
-    // LLM Report Container (Always show, with streaming effect)
-    html += '<div class="llm-report" id="llmReportContainer" style="margin-top: 25px; padding: 25px; background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(20,20,40,0.6) 100%); border-radius: 20px; text-align: left; border: 1px solid rgba(0,212,255,0.3);">';
-    html += '<h4 style="color: #00d4ff; margin-bottom: 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">🤖 AI Fact-Check Report</h4>';
-    html += '<div id="llmReportText" style="white-space: pre-wrap; line-height: 1.8; font-size: 1rem; color: #e0e0e0;"></div>';
-    html += '</div>';
-
+    html += '</div></details>';
     html += '</div>';
 
     resultSection.innerHTML = html;
     resultSection.style.display = 'block';
 
-    // Start typewriter effect for LLM report
-    const llmReport = verdict.llm_report || '';
-    if (llmReport) {
-        typewriterEffect('llmReportText', llmReport, 15);
+    // Start typewriter effect for AI reasoning (the main explanation from LLM)
+    if (explanationEn && explanationEn.length > 50) {
+        typewriterEffect('aiReasoningText', explanationEn, 10);
     } else {
-        document.getElementById('llmReportText').innerHTML = '<span style="color: #888;">Generating AI analysis... (Check API keys in .env if this persists)</span>';
+        const aiReasoningText = document.getElementById('aiReasoningText');
+        if (aiReasoningText) {
+            aiReasoningText.innerHTML = explanationEn || '<span style="color: #888;">Generating AI analysis... (Check API keys in .env if this persists)</span>';
+        }
     }
 }
 

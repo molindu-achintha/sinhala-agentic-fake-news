@@ -118,7 +118,8 @@ class HybridVerifier:
             cross_exam, 
             cot_result,
             web_analysis,
-            wikidata_result
+            wikidata_result,
+            llm_provider
         )
         
         # Step 7: Store in memory
@@ -155,9 +156,10 @@ class HybridVerifier:
         cross_exam: Dict,
         cot_result: Dict,
         web_analysis: Dict = None,
-        wikidata_result: Optional[object] = None
+        wikidata_result: Optional[object] = None,
+        llm_provider: str = "groq"
     ) -> Dict:
-        """Generate the final comprehensive verdict with web & wikidata analysis."""
+        """Generate the final comprehensive verdict with LLM-powered reasoning."""
         
         # Use CoT result as primary verdict
         verdict_label = cot_result.get("verdict", "unverified")
@@ -194,9 +196,13 @@ class HybridVerifier:
             else:
                 confidence = max(confidence, 0.75)
         
-        # Generate explanations
+        # Generate explanations using LLM-powered verdict
+        print(f"[HybridVerifier] Calling LLM verdict with provider: {llm_provider}")
         verdict = self.verdict_agent.generate_verdict(
-            claim={"claim_text": claim},
+            claim={
+                "original_claim": claim,
+                "translated_claim": decomposed.get("translated_claim", claim)
+            },
             reasoning={
                 "verdict_recommendation": verdict_label,
                 "match_analysis": {
@@ -206,7 +212,9 @@ class HybridVerifier:
                     "wikidata_verified": bool(wikidata_result)
                 }
             },
-            evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", [])
+            evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", []),
+            web_analysis=web_analysis,
+            llm_provider=llm_provider
         )
         
         # Override with final results
