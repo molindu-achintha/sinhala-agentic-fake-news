@@ -34,12 +34,14 @@ class VerdictAgent:
     # LLM endpoints
     LLM_ENDPOINTS = {
         "groq": "https://api.groq.com/openai/v1/chat/completions",
-        "openrouter": "https://openrouter.ai/api/v1/chat/completions"
+        "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+        "deepresearch": "https://openrouter.ai/api/v1/chat/completions"  # Via OpenRouter
     }
     
     LLM_MODELS = {
         "groq": "llama-3.1-70b-versatile",
-        "openrouter": "mistralai/mistral-7b-instruct"
+        "openrouter": "mistralai/mistral-7b-instruct",
+        "deepresearch": "alibaba/tongyi-deepresearch-30b-a3b"  # Specialized for deep research
     }
     
     def __init__(self):
@@ -73,6 +75,7 @@ class VerdictAgent:
         if llm_provider == "groq":
             api_key = os.getenv("GROQ_API_KEY", "")
         else:
+            # Both openrouter and deepresearch use OpenRouter API
             api_key = os.getenv("OPENROUTER_API_KEY", "")
         
         # Build context from all evidence
