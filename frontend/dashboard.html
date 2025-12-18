@@ -343,6 +343,32 @@
                 "අද සිට ඉන්ධන මිල අඩු වේ",false
             </div>
 
+            <!-- Settings Container -->
+            <div
+                style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label for="evalLlmProvider"
+                        style="display: block; color: #888; margin-bottom: 5px; font-size: 0.9rem;">AI Model</label>
+                    <select id="evalLlmProvider"
+                        style="width: 100%; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 1rem;">
+                        <option value="deepresearch" selected>🔬 DeepResearch (Alibaba)</option>
+                        <option value="groq">Groq (Llama 3.1)</option>
+                        <option value="openrouter">OpenRouter (Mistral)</option>
+                    </select>
+                </div>
+
+                <div style="flex: 1; min-width: 200px; display: flex; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="evalUseVectorDb" checked
+                            style="width: 20px; height: 20px; accent-color: #00d4ff;">
+                        <div>
+                            <span style="display: block; font-weight: bold;">Use Knowledge Base</span>
+                            <span style="font-size: 0.8rem; color: #888;">Search internal database</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <div class="file-upload" onclick="document.getElementById('csvFile').click()">
                 <div class="file-upload-icon">📁</div>
                 <p>Click to upload CSV file</p>
@@ -469,6 +495,11 @@ Example:
             document.getElementById('runEvalBtn').disabled = true;
             document.getElementById('progressCard').style.display = 'block';
 
+            // Get selected settings
+            const llmProvider = document.getElementById('evalLlmProvider').value;
+            const useVectorDb = document.getElementById('evalUseVectorDb').checked;
+            console.log('[Eval] Using:', { llmProvider, useVectorDb });
+
             evaluationResults = [];
             stats = { total: 0, correct: 0, trueCount: 0, falseCount: 0 };
 
@@ -483,7 +514,11 @@ Example:
                     const response = await fetch(API_BASE + '/v1/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: item.text })
+                        body: JSON.stringify({
+                            text: item.text,
+                            llm_provider: llmProvider,
+                            use_vector_db: useVectorDb
+                        })
                     });
 
                     const data = await response.json();
