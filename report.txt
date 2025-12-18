@@ -8813,6 +8813,243 @@ Where:
 
 
 ================================================================================
+                    APPENDIX I: UPDATED TWO-STAGE AGENTIC ARCHITECTURE
+================================================================================
+
+This appendix describes the new Two-Stage Agentic Architecture that was 
+implemented in December 2024. This is a major improvement to the system.
+
+
+I.1 WHAT IS THE NEW ARCHITECTURE?
+---------------------------------
+
+The old system used many small agents that worked together. The new system 
+uses just TWO main agents that work one after the other:
+
+    STAGE 1: RESEARCH AGENT → Finds evidence from the web
+    STAGE 2: JUDGE AGENT → Gives verdict with explanation in Sinhala
+
+This is simpler and more powerful than the old system.
+
+
+I.2 WHY DID WE CHANGE?
+----------------------
+
+The old system had some problems:
+
+PROBLEM 1: The web search was not working well for Sinhala claims.
+PROBLEM 2: The keywords were getting split up in wrong ways.
+PROBLEM 3: The explanations were not always in Sinhala.
+PROBLEM 4: The system sometimes changed the meaning of the claim.
+
+The new system fixes all these problems.
+
+
+I.3 STAGE 1: THE RESEARCH AGENT
+-------------------------------
+
+The Research Agent is like a journalist who searches for information.
+
+WHAT IT DOES:
+- Takes the user's claim exactly as they typed it (NO CHANGES!)
+- Searches the web for evidence
+- Looks at Sinhala news sites (like Hiru, Newsfirst, Lankadeepa)
+- Looks at English news sites (like BBC, Reuters)
+- Collects snippets from web pages
+- Labels each snippet as SUPPORTS, REFUTES, or IRRELEVANT
+
+WHAT IT RETURNS:
+A JSON file with this structure:
+{
+    "claim_original": "user's exact claim",
+    "claim_normalized_si": "claim in Sinhala",
+    "claim_normalized_en": "claim in English", 
+    "evidence": [
+        {
+            "id": 1,
+            "relation": "SUPPORTS or REFUTES",
+            "outlet": "name of news site",
+            "snippet": "what the article says",
+            "url": "link to the source"
+        }
+    ]
+}
+
+IMPORTANT RULE:
+The Research Agent is FORBIDDEN from changing the claim meaning.
+If the claim is about "Mihintale police arrested 3 suspects for elephant 
+burning", it cannot change it to "elephant is the largest animal".
+
+
+I.4 STAGE 2: THE JUDGE AGENT
+----------------------------
+
+The Judge Agent is like a court judge who reviews evidence and gives verdict.
+
+WHAT IT GETS:
+- The JSON from the Research Agent with all the evidence
+
+WHAT IT DOES:
+- Reads all the evidence
+- Weighs the evidence (official sources > random blogs)
+- Decides if the claim is TRUE, FALSE, PARTLY_TRUE, or UNVERIFIED
+- Writes an explanation in SINHALA
+- Adds citations like [1], [2], [3]
+
+WHAT IT RETURNS:
+A Sinhala explanation with this format:
+
+    තීන්දුව: TRUE/FALSE/PARTLY_TRUE/UNVERIFIED
+    
+    [Explanation in Sinhala with citations]
+    
+    [1] Source1 name, date, url
+    [2] Source2 name, date, url
+
+
+I.5 THE AI MODEL USED (DEEPRESEARCH)
+------------------------------------
+
+Both agents use a special AI model called:
+
+    Alibaba Tongyi DeepResearch (30 billion parameters)
+
+This model is made by Alibaba and is good at:
+- Searching the web
+- Understanding multiple languages
+- Writing explanations
+- Following instructions carefully
+
+We access this model through OpenRouter API.
+
+
+I.6 HOW THE NEW SYSTEM WORKS (STEP BY STEP)
+-------------------------------------------
+
+Step 1: User types a claim in the website
+        Example: "මිහින්තලය පොලීසිය සැකකරුවන් තිදෙනෙකු අත්අඩංගුවට ගත්තා"
+
+Step 2: The claim goes to the backend server
+
+Step 3: Research Agent receives the claim
+
+Step 4: Research Agent searches the web (both Sinhala and English)
+
+Step 5: Research Agent collects evidence and creates JSON
+
+Step 6: Judge Agent receives the JSON
+
+Step 7: Judge Agent weighs the evidence
+
+Step 8: Judge Agent writes verdict + Sinhala explanation
+
+Step 9: Result is sent back to the website
+
+Step 10: User sees the verdict with evidence cards
+
+
+I.7 THE USER INTERFACE IMPROVEMENTS
+-----------------------------------
+
+The frontend was also updated with new features:
+
+FEATURE 1: Clear Previous Results
+- When you click "Verify", old results disappear immediately
+
+FEATURE 2: Progress Updates
+- You see step-by-step status:
+  🔍 Starting verification...
+  📝 Step 1: Analyzing claim...
+  🌐 Step 2: Research Agent gathering evidence...
+  ⚖️ Step 3: Judge Agent analyzing evidence...
+  ✅ Verification complete!
+
+FEATURE 3: Better Output Structure
+- Verdict Header with big badge
+- 📋 Analyzed Claim section
+- 📝 Detailed Analysis section (Sinhala)
+- 🔍 Evidence Sources cards
+- 📚 Citation References
+
+FEATURE 4: AI Model Selection
+- DeepResearch (Alibaba) - best for fact-checking
+- Groq (Llama 3.1) - fast alternative
+- OpenRouter (Mistral) - another option
+
+FEATURE 5: Vector DB Toggle
+- Turn on/off the knowledge base search
+
+
+I.8 API ENDPOINTS
+-----------------
+
+The main API endpoint is:
+
+POST /v1/predict
+
+Request body:
+{
+    "text": "claim to verify",
+    "llm_provider": "deepresearch",
+    "use_vector_db": true
+}
+
+Response includes:
+- verdict.label: TRUE, FALSE, PARTLY_TRUE, NEEDS_VERIFICATION
+- verdict.confidence: 0.0 to 1.0
+- verdict.explanation_si: Sinhala explanation
+- research_evidence: JSON from Research Agent
+
+
+I.9 DEPLOYMENT
+--------------
+
+The system is deployed on:
+
+Backend: https://sinhala-agentic-fake-news.onrender.com
+Frontend: GitHub Pages or local file
+
+Environment variables needed:
+- OPENROUTER_API_KEY: For AI model access
+- GROQ_API_KEY: For Groq model (optional)
+- PINECONE_API_KEY: For vector database
+
+
+I.10 FILES CHANGED
+------------------
+
+NEW FILES CREATED:
+- backend/app/agents/research_agent.py (Stage 1)
+- backend/app/agents/judge_agent.py (Stage 2)
+
+FILES REMOVED:
+- backend/app/agents/web_research_agent.py (old)
+- backend/app/agents/llm_synthesizer.py (old)
+
+FILES UPDATED:
+- backend/app/agents/verdict_agent.py (now orchestrates)
+- backend/app/agents/hybrid_verifier.py (simplified)
+- frontend/script.js (better UI)
+- frontend/index.html (new controls)
+
+
+I.11 SUMMARY
+-----------
+
+The new Two-Stage Agentic Architecture is:
+
+✓ SIMPLER: Just 2 stages instead of many agents
+✓ SMARTER: Uses specialized DeepResearch AI
+✓ SAFER: Never changes the original claim meaning
+✓ CLEARER: Gives Sinhala explanations with citations
+✓ FASTER: Progress updates show what is happening
+✓ BETTER: Structured evidence cards with source links
+
+This is a major improvement that makes the system more useful for 
+Sri Lankan users who want to verify news in their own language.
+
+
+================================================================================
                          END OF THESIS DOCUMENT
 ================================================================================
 
