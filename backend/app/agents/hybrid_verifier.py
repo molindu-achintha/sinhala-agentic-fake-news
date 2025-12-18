@@ -46,7 +46,13 @@ class HybridVerifier:
         
         print("[HybridVerifier] All agents and memory initialized")
     
-    def verify(self, claim: str, use_cache: bool = True, llm_provider: str = "groq") -> Dict:
+    def verify(
+        self, 
+        claim: str, 
+        use_cache: bool = True, 
+        llm_provider: str = "groq",
+        use_vector_db: bool = True
+    ) -> Dict:
         """
         Verify a claim using the hybrid pipeline.
         
@@ -54,6 +60,7 @@ class HybridVerifier:
             claim: The claim text to verify
             use_cache: Whether to check memory cache
             llm_provider: 'groq' or 'openrouter'
+            use_vector_db: Whether to search vector database
             
         Returns:
             Dict containing verdict, confidence, and reasoning
@@ -81,8 +88,12 @@ class HybridVerifier:
         )
         
         # Step 3: Retrieve evidence
-        print("[HybridVerifier] Step 3 Retrieving evidence")
-        evidence = self.retriever.retrieve(claim, decomposed)
+        print(f"[HybridVerifier] Step 3 Retrieving evidence (Vector DB: {use_vector_db})")
+        if use_vector_db:
+            evidence = self.retriever.retrieve(claim, decomposed)
+        else:
+            print("[HybridVerifier] Vector DB disabled, skipping retrieval")
+            evidence = {"labeled_history": [], "unlabeled_context": []}
         
         # Step 4: Cross examine evidence
         print("[HybridVerifier] Step 4 Cross examining evidence")

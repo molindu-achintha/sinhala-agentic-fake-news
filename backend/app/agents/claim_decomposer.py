@@ -142,10 +142,18 @@ class ClaimDecomposer:
             "තුළ", "මත", "සිට", "දක්වා", "හේතුවෙන්", "කර", "කරන", "කරයි"
         }
         
-        words = re.findall(r'\b\w+\b', claim)
-        keywords = [w for w in words if w.lower() not in stop_words and len(w) > 2]
+        # Use whitespace splitting for better Unicode support (Sinhala)
+        words = claim.split()
         
-        return keywords
+        # Clean words (remove punctuation)
+        cleaned_words = []
+        for w in words:
+            # Remove punctuation from start/end
+            clean_w = w.strip(".,!?\"':;()[]{}")
+            if clean_w and clean_w.lower() not in stop_words and len(clean_w) > 2:
+                cleaned_words.append(clean_w)
+        
+        return cleaned_words
     
     def _create_vector_query(self, claim: str, keywords: List[str]) -> str:
         """Create optimized query for vector search."""

@@ -264,13 +264,33 @@
 Enter a news claim to verify...
 
 Example: ශ්‍රී ලංකාවේ ජනගහනය මිලියන 22 කි"></textarea>
-                <div class="controls">
-                    <select id="llmProvider"
-                        style="padding: 10px 20px; border-radius: 20px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 1rem;">
-                        <option value="groq">Groq (Llama 3.1)</option>
-                        <option value="openrouter">OpenRouter (Mistral)</option>
-                    </select>
-                    <button id="checkButton">පරීක්ෂා කරන්න / Verify</button>
+                <div class="settings-container"
+                    style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px;">
+                    <div class="setting-group" style="flex: 1; min-width: 200px;">
+                        <label for="llmProvider"
+                            style="display: block; color: #888; margin-bottom: 5px; font-size: 0.9rem;">AI Model</label>
+                        <select id="llmProvider"
+                            style="width: 100%; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); font-size: 1rem;">
+                            <option value="groq">Groq (Llama 3.1)</option>
+                            <option value="openrouter">OpenRouter (Mistral)</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group" style="flex: 1; min-width: 200px; display: flex; align-items: center;">
+                        <label class="toggle-switch"
+                            style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="useVectorDb" checked
+                                style="width: 20px; height: 20px; accent-color: #00d4ff;">
+                            <div>
+                                <span style="display: block; font-weight: bold;">Use Knowledge Base</span>
+                                <span style="font-size: 0.8rem; color: #888;">Search internal database</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="controls" style="display: flex; justify-content: center; gap: 20px; align-items: center;">
+                    <button id="checkButton" style="min-width: 200px;">පරීක්ෂා කරන්න / Verify</button>
                     <span class="loader" id="loader">Verifying...</span>
                 </div>
             </div>

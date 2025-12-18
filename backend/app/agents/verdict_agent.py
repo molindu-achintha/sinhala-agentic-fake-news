@@ -212,8 +212,27 @@ Return ONLY valid JSON, no extra text."""
             }
             
         except Exception as e:
-            print(f"[VerdictAgent] Parse error: {e}")
-            return None
+            print(f"[VerdictAgent] Parse error: {e}. Falling back to text analysis.")
+            # Fallback: Treat content as the reasoning text
+            label = "needs_verification"
+            if "TRUE" in content.upper() and "FALSE" not in content.upper():
+                label = "true"
+            elif "FALSE" in content.upper() and "TRUE" not in content.upper():
+                label = "false"
+            elif "MISLEADING" in content.upper():
+                label = "misleading"
+                
+            return {
+                "label": label,
+                "confidence": 0.5,
+                "explanation_si": self.EXPLANATIONS_SI.get(label, ""),
+                "explanation_en": content,  # Use raw content as explanation
+                "detailed_explanation": content,
+                "citations": [],
+                "match_level": "llm_fallback",
+                "evidence_count": 0,
+                "llm_powered": True
+            }
     
     def _build_evidence_context(self, evidence: list, web_analysis: dict) -> str:
         """Build context string from all evidence sources."""

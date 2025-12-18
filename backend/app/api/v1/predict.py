@@ -28,6 +28,7 @@ class PredictRequest(BaseModel):
     source: Optional[str] = None
     top_k: int = 10
     llm_provider: str = "groq"  # 'groq' or 'openrouter'
+    use_vector_db: bool = True  # Toggle for using Vector DB (Knowledge Base)
 
 
 class PredictResponse(BaseModel):
@@ -72,7 +73,12 @@ async def predict(request: PredictRequest):
         
         # Run full verification pipeline
         print(f"[predict] Using LLM provider: {request.llm_provider}")
-        result = verifier.verify(request.text, llm_provider=request.llm_provider)
+        print(f"[predict] Use Vector DB: {request.use_vector_db}")
+        result = verifier.verify(
+            request.text, 
+            llm_provider=request.llm_provider,
+            use_vector_db=request.use_vector_db
+        )
         
         print("[predict] Verification complete")
         

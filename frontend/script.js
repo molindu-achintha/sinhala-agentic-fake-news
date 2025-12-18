@@ -65,7 +65,13 @@ async function checkClaim() {
     // Get selected LLM provider
     const llmProviderSelect = document.getElementById('llmProvider');
     const llmProvider = llmProviderSelect ? llmProviderSelect.value : 'groq';
+
+    // Get Vector DB toggle
+    const useVectorDbInput = document.getElementById('useVectorDb');
+    const useVectorDb = useVectorDbInput ? useVectorDbInput.checked : true;
+
     console.log('[checkClaim] Using LLM provider:', llmProvider);
+    console.log('[checkClaim] Use Vector DB:', useVectorDb);
 
     try {
         const response = await fetch(API_BASE + '/v1/predict', {
@@ -75,7 +81,8 @@ async function checkClaim() {
             },
             body: JSON.stringify({
                 text: claim,
-                llm_provider: llmProvider
+                llm_provider: llmProvider,
+                use_vector_db: useVectorDb
             })
         });
 
