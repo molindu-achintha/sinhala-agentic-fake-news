@@ -1,17 +1,29 @@
+# FastAPI and server
 fastapi==0.104.1
 uvicorn==0.24.0
-python-dotenv==1.0.0
-requests>=2.31.0
-numpy==1.26.2
-pinecone==8.0.0
-transformers>=4.41.0
-torch>=2.2.0
-sentence-transformers>=2.6.0
-tenacity==8.2.3
-redis==5.0.1
-psycopg2-binary==2.9.9
-duckduckgo-search
 pydantic-settings==2.1.0
+
+# Environment and config
+python-dotenv==1.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Pinecone vector database
+pinecone==8.0.0
+
+# Search and translation
+duckduckgo-search
 deep-translator==1.11.4
+
+# Web scraping
 beautifulsoup4
 lxml
+
+# Optional: caching (graceful fallback if not available)
+redis==5.0.1
+psycopg2-binary==2.9.9
+
+# Utilities
+tenacity==8.2.3
+numpy==1.26.2
