@@ -83,45 +83,114 @@ class LLMSynthesizer:
         evidence: List[Dict],
         translated_claim: str
     ) -> str:
-        """Build the fact-check prompt."""
+        """Build the fact-check prompt with ChatGPT-style formatting."""
         
-        # Format evidence
+        # Extract source names from URLs
         evidence_text = ""
+        source_names = []
         for i, e in enumerate(evidence, 1):
-            source = e.get("source_url", "Unknown")
+            url = e.get("source_url", "")
             title = e.get("title", "No title")
-            snippet = e.get("content_snippet", "")[:300]
+            snippet = e.get("content_snippet", "")[:400]
             stance = e.get("stance", "neutral")
-            evidence_text += f"{i}. [{title}]({source})\n   Stance: {stance}\n   Content: {snippet}\n\n"
+            
+            # Extract source name from URL
+            source_name = self._extract_source_name(url)
+            source_names.append(source_name)
+            
+            evidence_text += f"""
+Source {i}: {source_name}
+URL: {url}
+Title: {title}
+Stance: {stance}
+Content: {snippet}
+"""
         
-        prompt = f"""You are a fact-checker. Analyze the claim below using the provided evidence.
+        prompt = f"""You are a professional fact-checker. Analyze this claim using the evidence provided.
 
 CLAIM (Sinhala): {claim}
 CLAIM (English): {translated_claim}
 
-EVIDENCE FROM WEB SEARCH:
-{evidence_text if evidence_text else "No evidence found."}
+EVIDENCE COLLECTED FROM WEB SEARCH:
+{evidence_text if evidence_text else "No evidence found from web search."}
 
-Generate a fact-check report in this format:
+Generate a detailed fact-check report EXACTLY in this format:
 
-## ✅ Verdict: [TRUE / FALSE / MISLEADING / UNVERIFIED]
+---
 
-### 🔎 What the claim says
-[Brief summary of what is being claimed]
+This claim is [TRUE/FALSE/MISLEADING/UNVERIFIED]. [Brief one-line summary of why]
 
-### 📌 What we found
-[List each source with a brief summary]
-- **Source 1**: Summary
-- **Source 2**: Summary
+✔ What Actually Happened
 
-### 🧠 Analysis
-[Explain why the claim is true/false/misleading. Be specific.]
+[Explain the verified facts with specific details from the sources]
 
-### 📊 Confidence: [HIGH / MEDIUM / LOW]
+✔ Confirmations from Multiple Outlets
 
-Keep the response concise but informative. Use emojis for formatting."""
+[List each source with what they reported]:
+- **{source_names[0] if source_names else 'Source'}**: [What this source says]
+- **{source_names[1] if len(source_names) > 1 else 'Other Source'}**: [What this source says]
+[Add more sources if available]
+
+🧾 What the Statement Means
+
+[Provide context - is this a political statement vs legal fact? Is there exaggeration? What's the nuance?]
+
+📌 Key Points
+- ❌ or ✅ [Key finding 1]
+- ❌ or ✅ [Key finding 2]
+- ❌ or ✅ [Key finding 3]
+
+---
+
+IMPORTANT RULES:
+1. Use the ACTUAL source names from the evidence (like Daily Mirror, Hiru News, etc.)
+2. Include URLs as citations where possible
+3. Be specific about what each source says
+4. If the claim is partially true, explain what part is true and what is false
+5. Use emojis for visual structure
+6. Keep it professional but readable
+"""
 
         return prompt
+    
+    def _extract_source_name(self, url: str) -> str:
+        """Extract readable source name from URL."""
+        if not url:
+            return "Unknown Source"
+            
+        # Common Sri Lankan news sources
+        source_map = {
+            "dailymirror": "Daily Mirror",
+            "hirunews": "Hiru News",
+            "adaderana": "Ada Derana",
+            "newsfirst": "News First",
+            "lankadeepa": "Lankadeepa",
+            "divaina": "Divaina",
+            "themorning": "The Morning",
+            "island": "The Island",
+            "sundaytimes": "Sunday Times",
+            "bbc": "BBC",
+            "reuters": "Reuters",
+            "wikipedia": "Wikipedia",
+            "economictimes": "Economic Times",
+            "onlanka": "OnLanka",
+            "newswire": "Newswire"
+        }
+        
+        url_lower = url.lower()
+        for key, name in source_map.items():
+            if key in url_lower:
+                return name
+        
+        # Try to extract domain
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            # Clean up domain
+            domain = domain.replace("www.", "").split(".")[0]
+            return domain.title()
+        except:
+            return "Web Source"
     
     def _call_llm(self, prompt: str) -> Optional[str]:
         """Call the LLM API."""
