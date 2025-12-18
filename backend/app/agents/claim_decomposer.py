@@ -76,7 +76,10 @@ class ClaimDecomposer:
         
         # Generate search queries
         vector_query = self._create_vector_query(claim, keywords)
-        web_query = self._create_web_query(claim, keywords)
+        
+        # For Sinhala, use the original claim (first 150 chars) for search
+        # This ensures the search query is readable and not broken keywords
+        sinhala_web_query = claim[:150].strip() if claim else ""
         
         result = {
             "original_claim": claim,
@@ -86,7 +89,7 @@ class ClaimDecomposer:
             "years": years,
             "temporal_type": temporal_type,
             "vector_query": vector_query,
-            "web_query": web_query,
+            "web_query": sinhala_web_query,  # Use original claim for Sinhala search
             "english_web_query": english_web_query,
             "needs_web_search": temporal_type == "recent"
         }
