@@ -62,13 +62,21 @@ async function checkClaim() {
 
     showStatus('Verifying claim...');
 
+    // Get selected LLM provider
+    const llmProviderSelect = document.getElementById('llmProvider');
+    const llmProvider = llmProviderSelect ? llmProviderSelect.value : 'groq';
+    console.log('[checkClaim] Using LLM provider:', llmProvider);
+
     try {
         const response = await fetch(API_BASE + '/v1/predict', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ text: claim })
+            body: JSON.stringify({
+                text: claim,
+                llm_provider: llmProvider
+            })
         });
 
         if (!response.ok) {
@@ -158,6 +166,15 @@ function displayResult(result) {
             html += '<li>[' + cite.source + '] ' + cite.text + '</li>';
         }
         html += '</ul>';
+        html += '</div>';
+    }
+
+    // LLM Report (New)
+    const llmReport = verdict.llm_report || '';
+    if (llmReport) {
+        html += '<div class="llm-report" style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 15px; text-align: left;">';
+        html += '<h4 style="color: #00d4ff; margin-bottom: 15px;">AI Fact-Check Report</h4>';
+        html += '<div style="white-space: pre-wrap; line-height: 1.6;">' + llmReport + '</div>';
         html += '</div>';
     }
 

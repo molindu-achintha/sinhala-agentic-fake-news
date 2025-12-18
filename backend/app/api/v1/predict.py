@@ -27,6 +27,7 @@ class PredictRequest(BaseModel):
     text: str
     source: Optional[str] = None
     top_k: int = 10
+    llm_provider: str = "groq"  # 'groq' or 'openrouter'
 
 
 class PredictResponse(BaseModel):
@@ -70,16 +71,20 @@ async def predict(request: PredictRequest):
         verifier = get_hybrid_verifier()
         
         # Run full verification pipeline
-        result = verifier.verify(request.text)
+        print(f"[predict] Using LLM provider: {request.llm_provider}")
+        result = verifier.verify(request.text, llm_provider=request.llm_provider)
         
         print("[predict] Verification complete")
+        
+        # Add LLM report if available
+        llm_report = result.get("llm_report", "")
         
         return PredictResponse(
             claim=result["claim"],
             evidence=result["evidence"],
             cross_examination=result["cross_examination"],
             reasoning=result["reasoning"],
-            verdict=result["verdict"]
+            verdict={**result["verdict"], "llm_report": llm_report}
         )
         
     except Exception as e:

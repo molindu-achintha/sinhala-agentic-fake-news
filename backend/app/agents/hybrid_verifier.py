@@ -46,13 +46,14 @@ class HybridVerifier:
         
         print("[HybridVerifier] All agents and memory initialized")
     
-    def verify(self, claim: str, use_cache: bool = True) -> Dict:
+    def verify(self, claim: str, use_cache: bool = True, llm_provider: str = "groq") -> Dict:
         """
         Verify a claim using the hybrid pipeline.
         
         Args:
             claim: The claim text to verify
             use_cache: Whether to check memory cache
+            llm_provider: 'groq' or 'openrouter'
             
         Returns:
             Dict containing verdict, confidence, and reasoning
@@ -91,7 +92,9 @@ class HybridVerifier:
         print("[HybridVerifier] Step 5 Running Deep Web Research")
         web_analysis = self.research_agent.run(
             claim=decomposed.get("translated_claim", claim),
-            keywords=decomposed.get("english_keywords", [])
+            keywords=decomposed.get("english_keywords", []),
+            translated_claim=decomposed.get("translated_claim", claim),
+            llm_provider=llm_provider
         )
         
         # Step 6: Get few shot examples

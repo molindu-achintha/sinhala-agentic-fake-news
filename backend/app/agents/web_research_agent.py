@@ -13,6 +13,7 @@ import numpy as np
 from datetime import datetime
 
 from .browsing_tool import get_browsing_tool
+from .llm_synthesizer import get_llm_synthesizer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,14 +36,14 @@ class WebResearchAgent:
     2. Search: Find candidate URLs
     3. Browse: Read full content of promising pages
     4. Analyze: Determine stance and relevance using NLI
-    5. Synthesize: Create a consolidated report
+    5. Synthesize: Create a consolidated report using LLM
     """
     
     def __init__(self):
         print("[WebResearchAgent] Initializing...")
         self.browser = get_browsing_tool()
         
-        # Load NLI model for analysis (lightweight)
+        # Load NLI model for analysis
         try:
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
             print("[WebResearchAgent] NLI Model loaded")
@@ -50,14 +51,22 @@ class WebResearchAgent:
             print(f"[WebResearchAgent] Error loading model: {e}")
             self.model = None
             
-        self.max_browsing_steps = 3
+        self.max_browsing_steps = 5
         self.max_tokens_per_source = 1000
     
-    def run(self, claim: str, keywords: List[str] = None) -> Dict:
+    def run(
+        self,
+        claim: str,
+        keywords: List[str] = None,
+        translated_claim: str = "",
+        llm_provider: str = "groq"
+    ) -> Dict:
         """
         Run the full research loop for a claim.
+        llm_provider: 'groq' or 'openrouter'
         """
         print(f"[WebResearchAgent] Starting research for: {claim[:50]}...")
+        print(f"[WebResearchAgent] LLM Provider: {llm_provider}")
         
         # 1. Plan
         queries = self._plan_search(claim, keywords)
@@ -70,11 +79,18 @@ class WebResearchAgent:
         collected_evidence = []
         for url_info in candidate_urls[:self.max_browsing_steps]:
             evidence = self._process_url(url_info, claim)
-            if evidence and evidence.relevance_score > 0.4:
+            if evidence and evidence.relevance_score > 0.3:
                 collected_evidence.append(evidence)
         
-        # 4. Synthesize
-        report = self._synthesize_report(claim, collected_evidence)
+        print(f"[WebResearchAgent] Collected {len(collected_evidence)} evidence items")
+        
+        # 4. Synthesize with LLM
+        report = self._synthesize_report(
+            claim,
+            collected_evidence,
+            translated_claim,
+            llm_provider
+        )
         
         return report
 
@@ -191,8 +207,14 @@ class WebResearchAgent:
         # If mismatch in negation count, possible contradiction
         return claim_negs != ev_negs
 
-    def _synthesize_report(self, claim: str, evidence_list: List[ResearchEvidence]) -> Dict:
-        """Aggregates evidence into a final report."""
+    def _synthesize_report(
+        self,
+        claim: str,
+        evidence_list: List[ResearchEvidence],
+        translated_claim: str = "",
+        llm_provider: str = "groq"
+    ) -> Dict:
+        """Aggregates evidence and generates LLM-powered report."""
         
         support_count = sum(1 for e in evidence_list if e.stance == "supports")
         refute_count = sum(1 for e in evidence_list if e.stance == "refutes")
@@ -209,6 +231,18 @@ class WebResearchAgent:
             verdict_override = "likely_false"
         elif support_count > 0:
             confidence_boost = 0.1
+        
+        # Generate LLM report
+        llm_report = None
+        if evidence_list:
+            print("[WebResearchAgent] Generating LLM report...")
+            synthesizer = get_llm_synthesizer(llm_provider)
+            llm_result = synthesizer.generate_report(
+                claim=claim,
+                evidence=[asdict(e) for e in evidence_list],
+                translated_claim=translated_claim
+            )
+            llm_report = llm_result.get("report", "")
             
         return {
             "evidence": [asdict(e) for e in evidence_list],
@@ -216,7 +250,9 @@ class WebResearchAgent:
             "refute_count": refute_count,
             "confidence_boost": confidence_boost,
             "verdict_override": verdict_override,
-            "summary": f"Found {len(evidence_list)} relevant sources. {support_count} support, {refute_count} refute."
+            "summary": f"Found {len(evidence_list)} relevant sources. {support_count} support, {refute_count} refute.",
+            "llm_report": llm_report,
+            "llm_provider": llm_provider
         }
 
 # Singleton
