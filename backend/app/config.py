@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # API Keys - Set these in .env file
     HF_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
     PINECONE_API_KEY: str | None = None
     
     # Pinecone Configuration

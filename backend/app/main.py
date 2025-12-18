@@ -10,6 +10,10 @@ from datetime import datetime
 
 from .config import get_settings
 from .api.v1 import predict, health, news, evaluate
+from dotenv import load_dotenv
+
+# Explicitly load .env file to ensure os.getenv works everywhere
+load_dotenv()
 
 # Load settings from .env file
 settings = get_settings()
