@@ -169,19 +169,70 @@ function displayResult(result) {
         html += '</div>';
     }
 
-    // LLM Report (New)
-    const llmReport = verdict.llm_report || '';
-    if (llmReport) {
-        html += '<div class="llm-report" style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 15px; text-align: left;">';
-        html += '<h4 style="color: #00d4ff; margin-bottom: 15px;">AI Fact-Check Report</h4>';
-        html += '<div style="white-space: pre-wrap; line-height: 1.6;">' + llmReport + '</div>';
-        html += '</div>';
-    }
+    // LLM Report Container (Always show, with streaming effect)
+    html += '<div class="llm-report" id="llmReportContainer" style="margin-top: 25px; padding: 25px; background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(20,20,40,0.6) 100%); border-radius: 20px; text-align: left; border: 1px solid rgba(0,212,255,0.3);">';
+    html += '<h4 style="color: #00d4ff; margin-bottom: 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">🤖 AI Fact-Check Report</h4>';
+    html += '<div id="llmReportText" style="white-space: pre-wrap; line-height: 1.8; font-size: 1rem; color: #e0e0e0;"></div>';
+    html += '</div>';
 
     html += '</div>';
 
     resultSection.innerHTML = html;
     resultSection.style.display = 'block';
+
+    // Start typewriter effect for LLM report
+    const llmReport = verdict.llm_report || '';
+    if (llmReport) {
+        typewriterEffect('llmReportText', llmReport, 15);
+    } else {
+        document.getElementById('llmReportText').innerHTML = '<span style="color: #888;">Generating AI analysis... (Check API keys in .env if this persists)</span>';
+    }
+}
+
+/**
+ * Typewriter effect for streaming text display.
+ */
+function typewriterEffect(elementId, text, speed) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    let index = 0;
+    element.innerHTML = '<span class="cursor" style="animation: blink 1s infinite;">▌</span>';
+
+    // Add cursor blink animation
+    const style = document.createElement('style');
+    style.textContent = '@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }';
+    document.head.appendChild(style);
+
+    function type() {
+        if (index < text.length) {
+            // Get next chunk (for faster typing)
+            const chunk = text.slice(index, index + 3);
+            element.innerHTML = formatMarkdown(text.slice(0, index + chunk.length)) + '<span class="cursor" style="animation: blink 1s infinite;">▌</span>';
+            index += chunk.length;
+            setTimeout(type, speed);
+        } else {
+            // Remove cursor when done
+            element.innerHTML = formatMarkdown(text);
+        }
+    }
+
+    type();
+}
+
+/**
+ * Basic markdown to HTML formatting.
+ */
+function formatMarkdown(text) {
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #00d4ff;">$1</strong>')
+        .replace(/\n/g, '<br>')
+        .replace(/✔/g, '<span style="color: #10b981;">✔</span>')
+        .replace(/❌/g, '<span style="color: #ef4444;">❌</span>')
+        .replace(/✅/g, '<span style="color: #10b981;">✅</span>')
+        .replace(/📌/g, '<span style="font-size: 1.2em;">📌</span>')
+        .replace(/🧾/g, '<span style="font-size: 1.2em;">🧾</span>')
+        .replace(/🔎/g, '<span style="font-size: 1.2em;">🔎</span>');
 }
 
 /**
