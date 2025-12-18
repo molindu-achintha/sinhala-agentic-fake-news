@@ -3,15 +3,20 @@ hybrid_verifier.py
 
 Temporal Hybrid Verifier main orchestrator.
 Coordinates the full verification pipeline with memory caching.
+
+Simplified Pipeline (v4 - Two-Stage Agentic):
+1. Check cache
+2. Decompose claim
+3. (Optional) Vector DB retrieval
+4. Two-stage agentic verification (Research Agent → Judge Agent)
+5. Store in memory
 """
 from typing import Dict, Optional
 
 from .claim_decomposer import ClaimDecomposer
 from .hybrid_retriever import HybridRetriever
 from .cross_examiner import CrossExaminer
-from .cot_reasoner import CoTReasoner
 from .verdict_agent import VerdictAgent
-from .web_research_agent import get_web_research_agent
 from .wikidata_client import get_wikidata_client
 from ..store.memory_store import get_memory_manager
 
@@ -21,24 +26,25 @@ class HybridVerifier:
     Main orchestrator for Temporal Hybrid Verification.
     Uses Redis for short term cache and PostgreSQL for long term memory.
     
-    Flow:
+    Simplified Flow (v4):
     1. Check memory cache for existing result
-    2. If not cached, run full verification pipeline
-    3. Store result in both short and long term memory
+    2. Decompose claim (normalize, translate)
+    3. Optional: Vector DB retrieval for context
+    4. Two-stage agentic verification:
+       - Stage 1: Research Agent (web search + evidence collection)
+       - Stage 2: Judge Agent (verdict + Sinhala explanation)
+    5. Store result in both short and long term memory
     """
     
     def __init__(self):
         """Initialize all agents and memory."""
         print("[HybridVerifier] Initializing")
         
-        # Initialize agents
+        # Core agents
         self.decomposer = ClaimDecomposer()
         self.retriever = HybridRetriever()
         self.examiner = CrossExaminer()
-        self.reasoner = CoTReasoner()
         self.verdict_agent = VerdictAgent()
-        # self.web_analyzer = get_web_analyzer()  # DEPRECATED
-        self.research_agent = get_web_research_agent() # NEW V3 Agent
         self.wikidata = get_wikidata_client()
         
         # Initialize memory manager
@@ -50,23 +56,23 @@ class HybridVerifier:
         self, 
         claim: str, 
         use_cache: bool = True, 
-        llm_provider: str = "groq",
+        llm_provider: str = "deepresearch",
         use_vector_db: bool = True
     ) -> Dict:
         """
-        Verify a claim using the hybrid pipeline.
+        Verify a claim using the two-stage agentic pipeline.
         
         Args:
             claim: The claim text to verify
             use_cache: Whether to check memory cache
-            llm_provider: 'groq' or 'openrouter'
-            use_vector_db: Whether to search vector database
+            llm_provider: LLM to use ('deepresearch' recommended)
+            use_vector_db: Whether to search vector database for context
             
         Returns:
-            Dict containing verdict, confidence, and reasoning
+            Dict containing verdict, confidence, and Sinhala explanation
         """
         print("[HybridVerifier] Starting verification")
-        print("[HybridVerifier] Claim:", claim[:100])
+        print(f"[HybridVerifier] Claim: {claim[:100]}")
         
         # Step 0: Check memory cache
         if use_cache:
@@ -76,265 +82,88 @@ class HybridVerifier:
                 cached_result["from_cache"] = True
                 return cached_result
         
-        # Step 1: Decompose claim
-        print("[HybridVerifier] Step 1 Decomposing claim")
+        # Step 1: Decompose claim (normalize, translate, extract keywords)
+        print("[HybridVerifier] Step 1: Decomposing claim")
         decomposed = self.decomposer.decompose(claim)
         
-        # Step 2: Verify against Wikidata (NEW)
-        print("[HybridVerifier] Step 2 Checking Wikidata")
+        # Step 2: (Optional) Wikidata verification for factual claims
+        print("[HybridVerifier] Step 2: Checking Wikidata")
         wikidata_result = self.wikidata.verify_claim(
             claim=claim,
             translated_claim=decomposed.get("translated_claim", claim)
         )
         
-        # Step 3: Retrieve evidence
-        print(f"[HybridVerifier] Step 3 Retrieving evidence (Vector DB: {use_vector_db})")
+        # Step 3: (Optional) Vector DB retrieval for context
+        evidence = {"labeled_history": [], "unlabeled_context": []}
+        cross_exam = {}
+        
         if use_vector_db:
+            print("[HybridVerifier] Step 3: Retrieving from Vector DB")
             evidence = self.retriever.retrieve(claim, decomposed)
+            cross_exam = self.examiner.examine(evidence, decomposed)
         else:
-            print("[HybridVerifier] Vector DB disabled, skipping retrieval")
-            evidence = {"labeled_history": [], "unlabeled_context": []}
+            print("[HybridVerifier] Step 3: Vector DB disabled, skipping")
         
-        # Step 4: Cross examine evidence
-        print("[HybridVerifier] Step 4 Cross examining evidence")
-        cross_exam = self.examiner.examine(evidence, decomposed)
-        
-        # Step 5: Deep Web Research (NEW V3)
-        print("[HybridVerifier] Step 5 Running Deep Web Research")
-        web_analysis = self.research_agent.run(
-            claim=decomposed.get("translated_claim", claim),
-            keywords=decomposed.get("english_keywords", []),
-            translated_claim=decomposed.get("translated_claim", claim),
+        # Step 4: Two-stage agentic verification (main pipeline)
+        print("[HybridVerifier] Step 4: Running two-stage agentic verification")
+        verdict_result = self.verdict_agent.generate_verdict(
+            claim=decomposed,
+            reasoning=None,  # Not used in new pipeline
+            evidence=evidence.get("labeled_history", []),
             llm_provider=llm_provider
         )
         
-        # Step 6: Get few shot examples
-        few_shot_examples = self._get_few_shot_examples(evidence)
+        # Build full result
+        result = {
+            "claim": {
+                "original": claim,
+                "translated": decomposed.get("translated_claim", ""),
+                "normalized_si": verdict_result.get("claim_normalized_si", ""),
+                "normalized_en": verdict_result.get("claim_normalized_en", ""),
+                "temporal_type": decomposed.get("temporal_type", "general"),
+                "keywords": decomposed.get("keywords", [])
+            },
+            "evidence": {
+                "labeled_history": evidence.get("labeled_history", []),
+                "unlabeled_context": evidence.get("unlabeled_context", []),
+                "web_count": len(verdict_result.get("research_evidence", {}).get("evidence", []))
+            },
+            "cross_examination": cross_exam,
+            "reasoning": {
+                "wikidata": wikidata_result,
+                "evidence_count": verdict_result.get("evidence_count", 0),
+                "supports_count": verdict_result.get("supports_count", 0),
+                "refutes_count": verdict_result.get("refutes_count", 0)
+            },
+            "verdict": {
+                "label": verdict_result.get("label", "needs_verification"),
+                "confidence": verdict_result.get("confidence", 0.5),
+                "explanation_si": verdict_result.get("explanation_si", ""),
+                "explanation_en": verdict_result.get("explanation_en", ""),
+                "detailed_explanation": verdict_result.get("detailed_explanation", ""),
+                "citations": verdict_result.get("citations", []),
+                "llm_powered": verdict_result.get("llm_powered", False)
+            },
+            "research_evidence": verdict_result.get("research_evidence", {})
+        }
         
-        # Step 7: Chain of Thought reasoning
-        print("[HybridVerifier] Step 6 Chain of Thought reasoning")
-        cot_result = self.reasoner.reason(
-            claim, 
-            evidence, 
-            cross_exam,
-            few_shot_examples
-        )
-        
-        # Step 8: Generate final verdict (with web & wikidata analysis)
-        print("[HybridVerifier] Step 7 Generating verdict")
-        result = self._generate_final_verdict(
-            claim, 
-            decomposed, 
-            evidence, 
-            cross_exam, 
-            cot_result,
-            web_analysis,
-            wikidata_result,
-            llm_provider
-        )
-        
-        # Step 7: Store in memory
-        print("[HybridVerifier] Step 6 Storing in memory")
+        # Step 5: Store in memory
+        print("[HybridVerifier] Step 5: Storing in memory")
         self.memory.store_result(claim, result)
         
         result["from_cache"] = False
         
         print("[HybridVerifier] Verification complete")
-        print("[HybridVerifier] Verdict:", result['verdict']['label'])
+        print(f"[HybridVerifier] Verdict: {result['verdict']['label']}")
         
         return result
-    
-    def _get_few_shot_examples(self, evidence: Dict) -> list:
-        """Extract few shot examples from labeled evidence."""
-        examples = []
-        labeled = evidence.get("labeled_history", [])
-        
-        for doc in labeled[:3]:
-            if doc.get("score", 0) >= 0.70:
-                examples.append({
-                    "claim": doc.get("text", "")[:100],
-                    "evidence": doc.get("text", ""),
-                    "label": doc.get("label", "")
-                })
-        
-        return examples
-    
-    def _generate_final_verdict(
-        self,
-        claim: str,
-        decomposed: Dict,
-        evidence: Dict,
-        cross_exam: Dict,
-        cot_result: Dict,
-        web_analysis: Dict = None,
-        wikidata_result: Optional[object] = None,
-        llm_provider: str = "groq"
-    ) -> Dict:
-        """Generate the final comprehensive verdict with LLM-powered reasoning."""
-        
-        # Use CoT result as primary verdict
-        verdict_label = cot_result.get("verdict", "unverified")
-        confidence = cot_result.get("confidence", 0.5)
-        
-        # APPLY WIKIDATA RESULT (Highest Priority)
-        if wikidata_result:
-            print(f"[HybridVerifier] Using Wikidata result: Correct={wikidata_result.is_correct}")
-            if wikidata_result.is_correct:
-                verdict_label = "true"
-                confidence = max(confidence, 0.95)
-            else:
-                verdict_label = "false"
-                confidence = max(confidence, 0.95)
-        
-        # APPLY WEB ANALYSIS (Secondary Priority)
-        web_analysis = web_analysis or {}
-        confidence_boost = web_analysis.get("confidence_boost", 0)
-        verdict_override = web_analysis.get("verdict_override")
-        
-        # Apply confidence boost from web evidence (if no Wikidata override)
-        if not wikidata_result and confidence_boost != 0:
-            original_confidence = confidence
-            confidence = max(0.1, min(0.95, confidence + confidence_boost))
-            print(f"[HybridVerifier] Web boost: {original_confidence:.2f} + {confidence_boost:+.2f} = {confidence:.2f}")
-        
-        # Override verdict if web evidence is strong (and no Wikidata result)
-        if not wikidata_result and verdict_override and web_analysis.get("support_count", 0) >= 2:
-            print(f"[HybridVerifier] Verdict override: {verdict_label} -> {verdict_override}")
-            verdict_label = verdict_override
-            # Boost confidence for web-confirmed verdicts
-            if web_analysis.get("has_wikipedia"):
-                confidence = max(confidence, 0.85)
-            else:
-                confidence = max(confidence, 0.75)
-        
-        # Generate explanations using LLM-powered verdict
-        print(f"[HybridVerifier] Calling LLM verdict with provider: {llm_provider}")
-        verdict = self.verdict_agent.generate_verdict(
-            claim={
-                "original_claim": claim,
-                "translated_claim": decomposed.get("translated_claim", claim)
-            },
-            reasoning={
-                "verdict_recommendation": verdict_label,
-                "match_analysis": {
-                    "top_similarity": evidence.get("top_similarity", 0),
-                    "match_level": evidence.get("similarity_level", "none"),
-                    "web_count": evidence.get("web_count", 0),
-                    "wikidata_verified": bool(wikidata_result)
-                }
-            },
-            evidence=evidence.get("labeled_history", []) + evidence.get("unlabeled_context", []),
-            web_analysis=web_analysis,
-            llm_provider=llm_provider
-        )
-        
-        # Override with final results
-        verdict["label"] = verdict_label
-        verdict["confidence"] = confidence
-        
-        # Format web evidence for citations
-        web_citations = []
-        if wikidata_result:
-            web_citations.append({
-                "source": "[Wikidata]",
-                "text": wikidata_result.evidence,
-                "url": wikidata_result.source_url,
-                "stance": "supports" if wikidata_result.is_correct else "refutes",
-                "score": 1.0
-            })
-            
-        for we in web_analysis.get("evidence", []):
-            source_prefix = "[Wiki] " if we.get("is_wikipedia") else "[Web] "
-            stance_emoji = "✓" if we.get("stance") == "supports" else "✗" if we.get("stance") == "refutes" else "?"
-            web_citations.append({
-                "source": source_prefix + we.get("source", ""),
-                "text": we.get("content", "")[:150],
-                "url": we.get("url", ""),
-                "stance": we.get("stance", "neutral"),
-                "score": we.get("relevance", 0)
-            })
-        
-        # Build complete result
-        return {
-            "claim": {
-                "original": claim,
-                "translated": decomposed.get("translated_claim", ""),
-                "temporal_type": decomposed.get("temporal_type"),
-                "keywords": decomposed.get("keywords", [])[:5]
-            },
-            "evidence": {
-                "labeled_count": evidence.get("labeled_count", 0),
-                "unlabeled_count": evidence.get("unlabeled_count", 0),
-                "top_similarity": evidence.get("top_similarity", 0),
-                "similarity_level": evidence.get("similarity_level", "none"),
-                "citations": self._format_citations(evidence)
-            },
-            "web_analysis": {
-                "stance": web_analysis.get("overall_stance", "neutral"),
-                "support_count": web_analysis.get("support_count", 0),
-                "refute_count": web_analysis.get("refute_count", 0),
-                "has_wikipedia": web_analysis.get("has_wikipedia", False),
-                "confidence_boost": confidence_boost,
-                "citations": web_citations
-            },
-            "cross_examination": {
-                "weighted_score": cross_exam.get("weighted_score", 0),
-                "consensus": cross_exam.get("consensus", {}).get("type"),
-                "zombie_detected": cross_exam.get("zombie_check", {}).get("is_zombie", False),
-                "source_priority": cross_exam.get("source_priority")
-            },
-            "reasoning": {
-                "cot_reasoning": cot_result.get("reasoning", ""),
-                "steps": [
-                    {
-                        "step": "Claim Decomposition",
-                        "result": "Type " + str(decomposed.get('temporal_type')) + " Keywords " + str(', '.join(decomposed.get('keywords', [])[:3]))
-                    },
-                    {
-                        "step": "Evidence Retrieval",
-                        "result": "Found " + str(evidence.get('labeled_count', 0)) + " labeled " + str(evidence.get('unlabeled_count', 0)) + " unlabeled"
-                    },
-                    {
-                        "step": "Web Analysis",
-                        "result": f"Stance: {web_analysis.get('overall_stance', 'neutral')}, Support: {web_analysis.get('support_count', 0)}, Refute: {web_analysis.get('refute_count', 0)}"
-                    },
-                    {
-                        "step": "Cross Examination",
-                        "result": cross_exam.get("consensus", {}).get("message", "Analyzed")
-                    },
-                    {
-                        "step": "LLM Reasoning",
-                        "result": cot_result.get("reasoning", "")[:100]
-                    }
-                ]
-            },
-            "verdict": verdict
-        }
-    
-    def _format_citations(self, evidence: Dict) -> list:
-        """Format evidence as citations."""
-        citations = []
-        
-        for doc in evidence.get("labeled_history", [])[:3]:
-            citations.append({
-                "source": doc.get("source", "unknown"),
-                "text": doc.get("text", "")[:100],
-                "label": doc.get("label", ""),
-                "similarity": str(round(doc.get('score', 0) * 100)) + " percent"
-            })
-        
-        return citations
-    
-    def get_memory_stats(self) -> Dict:
-        """Get memory statistics."""
-        return self.memory.get_stats()
 
 
-# Create singleton instance
+# Singleton instance
 _verifier = None
 
 def get_hybrid_verifier() -> HybridVerifier:
-    """Get or create HybridVerifier instance."""
+    """Get or create the hybrid verifier singleton."""
     global _verifier
     if _verifier is None:
         _verifier = HybridVerifier()
