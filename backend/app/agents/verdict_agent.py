@@ -170,9 +170,20 @@ Return ONLY valid JSON, no extra text."""
         try:
             # Clean up response
             content = content.strip()
-            if content.startswith("```"):
-                content = re.sub(r'^```json?\n?', '', content)
-                content = re.sub(r'\n?```$', '', content)
+            
+            # Handle markdown code blocks
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+                
+            content = content.strip()
+            
+            # Use regex to find the JSON object if there's extra text
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                content = json_match.group(0)
             
             import json
             data = json.loads(content)

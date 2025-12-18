@@ -69,7 +69,7 @@ class WebResearchAgent:
         print(f"[WebResearchAgent] LLM Provider: {llm_provider}")
         
         # 1. Plan
-        queries = self._plan_search(claim, keywords)
+        queries = self._plan_search(claim, keywords, translated_claim)
         
         # 2. Search & Filter
         candidate_urls = self._search_web(queries)
@@ -94,15 +94,22 @@ class WebResearchAgent:
         
         return report
 
-    def _plan_search(self, claim: str, keywords: List[str]) -> List[str]:
+    def _plan_search(self, claim: str, keywords: List[str], translated_claim: str = None) -> List[str]:
         """Generate search queries."""
         queries = [claim]
-        if keywords:
-            # Add English keywords query
-            queries.append(" ".join(keywords))
-            # Add specific news query
-            queries.append(f"{' '.join(keywords[:5])} news sri lanka")
-        return queries
+        if translated_claim:
+            # 1. Main claim in English (best for global/context)
+            queries.append(translated_claim)
+            
+            # 2. Key entities + "fake news" or "fact check"
+            if keywords:
+                # Use only significant keywords (len > 3)
+                significant_keys = [k for k in keywords if len(k) > 3]
+                if significant_keys:
+                    queries.append(f"{' '.join(significant_keys[:4])} sri lanka fact check")
+                    queries.append(f"{' '.join(significant_keys[:4])} news")
+                    
+        return list(set(queries))[:3]  # Return unique top 3 queries
 
     def _search_web(self, queries: List[str]) -> List[Dict]:
         """Execute searches and return unique URLs."""
