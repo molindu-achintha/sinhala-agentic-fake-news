@@ -343,9 +343,10 @@
                 "අද සිට ඉන්ධන මිල අඩු වේ",false
             </div>
 
-            <div class="settings-container"
+            <!-- Settings Container -->
+            <div
                 style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px;">
-                <div class="setting-group" style="flex: 1; min-width: 200px;">
+                <div style="flex: 1; min-width: 200px;">
                     <label for="evalLlmProvider"
                         style="display: block; color: #888; margin-bottom: 5px; font-size: 0.9rem;">AI Model</label>
                     <select id="evalLlmProvider"
@@ -356,9 +357,8 @@
                     </select>
                 </div>
 
-                <div class="setting-group" style="flex: 1; min-width: 200px; display: flex; align-items: center;">
-                    <label class="toggle-switch"
-                        style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <div style="flex: 1; min-width: 200px; display: flex; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                         <input type="checkbox" id="evalUseVectorDb" checked
                             style="width: 20px; height: 20px; accent-color: #00d4ff;">
                         <div>
@@ -428,10 +428,7 @@ Example:
     <script>
         // API Base URL
         // API Base URL
-        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-            ? 'http://localhost:8000'
-            : 'https://sinhala-agentic-fake-news.onrender.com';
-
+        const API_BASE = "http://localhost:8000";
         // Store CSV data and results
         let csvData = [];
         let evaluationResults = [];
@@ -498,10 +495,10 @@ Example:
             document.getElementById('runEvalBtn').disabled = true;
             document.getElementById('progressCard').style.display = 'block';
 
-            // Get Settings
+            // Get selected settings
             const llmProvider = document.getElementById('evalLlmProvider').value;
             const useVectorDb = document.getElementById('evalUseVectorDb').checked;
-            console.log('Starting Eval with:', { llmProvider, useVectorDb });
+            console.log('[Eval] Using:', { llmProvider, useVectorDb });
 
             evaluationResults = [];
             stats = { total: 0, correct: 0, trueCount: 0, falseCount: 0 };
