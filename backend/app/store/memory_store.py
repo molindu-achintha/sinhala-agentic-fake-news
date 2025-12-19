@@ -188,15 +188,28 @@ class LongTermMemory:
         self.fallback_storage = {}  # In memory fallback
         
         if POSTGRES_AVAILABLE:
-            try:
-                self.conn = psycopg2.connect(self.database_url)
-                self._create_tables()
-                print("[LongTermMemory] PostgreSQL connected")
-            except Exception as e:
-                print("[LongTermMemory] PostgreSQL connection failed:", str(e))
-                self.conn = None
+            self._connect()
         else:
             print("[LongTermMemory] Using in memory fallback")
+    
+    def _connect(self):
+        """Establish PostgreSQL connection."""
+        try:
+            self.conn = psycopg2.connect(self.database_url)
+            self._create_tables()
+            print("[LongTermMemory] PostgreSQL connected")
+        except Exception as e:
+            print("[LongTermMemory] PostgreSQL connection failed:", str(e))
+            self.conn = None
+    
+    def _ensure_connection(self):
+        """Ensure connection is alive, reconnect if closed."""
+        if not POSTGRES_AVAILABLE:
+            return
+            
+        if self.conn is None or self.conn.closed != 0:
+            print("[LongTermMemory] Connection lost, reconnecting...")
+            self._connect()
     
     def _create_tables(self):
         """Create tables if not exist."""
@@ -216,6 +229,7 @@ class LongTermMemory:
         """Get stored verification result for a claim."""
         claim_hash = self._get_hash(claim)
         
+        self._ensure_connection()
         if self.conn:
             try:
                 with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -242,6 +256,7 @@ class LongTermMemory:
         """Store a verification result."""
         claim_hash = self._get_hash(claim)
         
+        self._ensure_connection()
         if self.conn:
             try:
                 with self.conn.cursor() as cur:
@@ -283,6 +298,7 @@ class LongTermMemory:
     
     def get_similar_verdicts(self, verdict: str, limit: int = 10) -> List[Dict]:
         """Get recent claims with same verdict."""
+        self._ensure_connection()
         if self.conn:
             try:
                 with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -300,6 +316,7 @@ class LongTermMemory:
     
     def get_stats(self) -> Dict:
         """Get memory statistics."""
+        self._ensure_connection()
         if self.conn:
             try:
                 with self.conn.cursor(cursor_factory=RealDictCursor) as cur:

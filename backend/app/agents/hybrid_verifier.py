@@ -109,7 +109,7 @@ class HybridVerifier:
         print("[HybridVerifier] Step 4: Running two-stage agentic verification")
         verdict_result = self.verdict_agent.generate_verdict(
             claim=decomposed,
-            reasoning=None,  # Not used in new pipeline
+            reasoning=None,  
             evidence=evidence.get("labeled_history", []),
             llm_provider=llm_provider,
             api_key=openrouter_api_key

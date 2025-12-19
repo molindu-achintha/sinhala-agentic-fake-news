@@ -87,12 +87,36 @@ async def predict(request: PredictRequest):
         # Add LLM report if available
         llm_report = result.get("llm_report", "")
         
+        # Handle cached results that may have different structure
+        claim_data = result.get("claim", {
+            "original": request.text,
+            "translated": "",
+            "normalized_si": "",
+            "normalized_en": ""
+        })
+        evidence_data = result.get("evidence", {"labeled_count": 0, "top_similarity": 0})
+        cross_exam_data = result.get("cross_examination", {})
+        reasoning_data = result.get("reasoning", {})
+        verdict_data = result.get("verdict", {"label": "unknown", "confidence": 0})
+        
+        # Handle case where fields might be strings (old cache format)
+        if not isinstance(claim_data, dict):
+            claim_data = {"original": request.text, "translated": "", "normalized_si": "", "normalized_en": ""}
+        if not isinstance(evidence_data, dict):
+            evidence_data = {"labeled_count": 0, "top_similarity": 0}
+        if not isinstance(cross_exam_data, dict):
+            cross_exam_data = {}
+        if not isinstance(reasoning_data, dict):
+            reasoning_data = {}
+        if not isinstance(verdict_data, dict):
+            verdict_data = {"label": str(verdict_data) if verdict_data else "unknown", "confidence": 0}
+        
         return PredictResponse(
-            claim=result["claim"],
-            evidence=result["evidence"],
-            cross_examination=result["cross_examination"],
-            reasoning=result["reasoning"],
-            verdict={**result["verdict"], "llm_report": llm_report}
+            claim=claim_data,
+            evidence=evidence_data,
+            cross_examination=cross_exam_data,
+            reasoning=reasoning_data,
+            verdict={**verdict_data, "llm_report": llm_report}
         )
         
     except Exception as e:
