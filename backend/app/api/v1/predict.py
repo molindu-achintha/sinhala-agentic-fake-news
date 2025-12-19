@@ -29,6 +29,7 @@ class PredictRequest(BaseModel):
     top_k: int = 10
     llm_provider: str = "groq"  # 'groq' or 'openrouter'
     use_vector_db: bool = True  # Toggle for using Vector DB (Knowledge Base)
+    openrouter_api_key: Optional[str] = None  # Dynamic API Key from Frontend
 
 
 class PredictResponse(BaseModel):
@@ -77,7 +78,8 @@ async def predict(request: PredictRequest):
         result = verifier.verify(
             request.text, 
             llm_provider=request.llm_provider,
-            use_vector_db=request.use_vector_db
+            use_vector_db=request.use_vector_db,
+            openrouter_api_key=request.openrouter_api_key
         )
         
         print("[predict] Verification complete")

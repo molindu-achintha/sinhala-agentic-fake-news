@@ -57,7 +57,8 @@ class HybridVerifier:
         claim: str, 
         use_cache: bool = True, 
         llm_provider: str = "deepresearch",
-        use_vector_db: bool = True
+        use_vector_db: bool = True,
+        openrouter_api_key: Optional[str] = None
     ) -> Dict:
         """
         Verify a claim using the two-stage agentic pipeline.
@@ -110,7 +111,8 @@ class HybridVerifier:
             claim=decomposed,
             reasoning=None,  # Not used in new pipeline
             evidence=evidence.get("labeled_history", []),
-            llm_provider=llm_provider
+            llm_provider=llm_provider,
+            api_key=openrouter_api_key
         )
         
         # Build full result

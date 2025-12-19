@@ -243,6 +243,67 @@
             margin: 15px 0;
             text-align: center;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .api-input-group {
+            margin-bottom: 20px;
+        }
+
+        .api-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00d4ff;
+        }
+
+        .api-input-group input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+        }
+
+        .save-btn {
+            background: #10b981;
+            width: 100%;
+        }
     </style>
 </head>
 
@@ -255,6 +316,7 @@
             <div class="nav-links">
                 <a href="index.html">Main App</a>
                 <a href="dashboard.html">Evaluation Dashboard</a>
+                <a href="#" id="settingsBtn">⚙️ Settings</a>
             </div>
         </header>
 
@@ -305,6 +367,29 @@ Example: ශ්‍රී ලංකාවේ ජනගහනය මිලිය�
             <p>Uses Redis cache, PostgreSQL memory, and Pinecone vector DB</p>
         </footer>
     </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeSettings">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #fff;">🔑 API Configuration</h2>
+
+            <div class="api-input-group">
+                <label for="openrouterKey">OpenRouter API Key</label>
+                <input type="password" id="openrouterKey" placeholder="sk-or-...">
+                <small style="color: #888; font-size: 0.8rem;">Required for Research & Verdict Agents</small>
+            </div>
+
+            <!-- Future: Pinecone Key -->
+            <!-- <div class="api-input-group">
+                <label for="pineconeKey">Pinecone API Key</label>
+                <input type="password" id="pineconeKey" placeholder="pc-...">
+            </div> -->
+
+            <button id="saveSettingsBtn" class="save-btn">Save Configuration</button>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 

@@ -47,7 +47,9 @@ class VerdictAgent:
         reasoning: dict = None, 
         evidence: list = None,
         web_analysis: dict = None,
-        llm_provider: str = "deepresearch"
+        web_analysis: dict = None,
+        llm_provider: str = "deepresearch",
+        api_key: str = None
     ) -> dict:
         """
         Generate final verdict using the two-stage agentic pipeline.
@@ -69,7 +71,7 @@ class VerdictAgent:
         # STAGE 1: Research Agent (gather evidence)
         # =========================================
         print("[VerdictAgent] Stage 1: Calling Research Agent...")
-        evidence_json = self.research_agent.research(original_claim)
+        evidence_json = self.research_agent.research(original_claim, api_key=api_key)
         
         if not evidence_json:
             print("[VerdictAgent] Research failed, using fallback")
@@ -81,7 +83,7 @@ class VerdictAgent:
         # STAGE 2: Judge Agent (produce verdict)
         # =========================================
         print("[VerdictAgent] Stage 2: Calling Judge Agent...")
-        verdict_result = self.judge_agent.judge(evidence_json)
+        verdict_result = self.judge_agent.judge(evidence_json, api_key=api_key)
         
         if not verdict_result:
             print("[VerdictAgent] Judgment failed, using fallback")

@@ -7,10 +7,61 @@
 
 // Backend API URL - Change this for production
 // const API_BASE = window.API_BASE || 'https://sinhala-agentic-fake-news.onrender.com';
-const API_BASE = "https://sinhala-agentic-fake-news.onrender.com";
-
+const API_BASE = "http://localhost:8000";
 // Status display element
 let statusDiv = null;
+
+// Settings Manager
+const SettingsManager = {
+    keys: {
+        openrouter: 'sfd_openrouter_key'
+    },
+
+    init() {
+        // Load saved keys
+        const savedKey = localStorage.getItem(this.keys.openrouter);
+        if (savedKey) {
+            const input = document.getElementById('openrouterKey');
+            if (input) input.value = savedKey;
+        }
+
+        // Setup Event Listeners
+        const modal = document.getElementById('settingsModal');
+        const btn = document.getElementById('settingsBtn');
+        const close = document.getElementById('closeSettings');
+        const save = document.getElementById('saveSettingsBtn');
+
+        if (btn) btn.onclick = () => modal.style.display = 'flex';
+        if (close) close.onclick = () => modal.style.display = 'none';
+        if (save) save.onclick = () => this.save();
+
+        // Close on outside click
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        };
+    },
+
+    save() {
+        const input = document.getElementById('openrouterKey');
+        if (input) {
+            const key = input.value.trim();
+            if (key) {
+                localStorage.setItem(this.keys.openrouter, key);
+                alert('API Key saved successfully!');
+                document.getElementById('settingsModal').style.display = 'none';
+            } else {
+                localStorage.removeItem(this.keys.openrouter);
+                alert('API Key cleared.');
+            }
+        }
+    },
+
+    getKey() {
+        return localStorage.getItem(this.keys.openrouter);
+    }
+};
 
 /**
  * Show a status message to the user.
@@ -95,7 +146,10 @@ async function checkClaim() {
             body: JSON.stringify({
                 text: claim,
                 llm_provider: llmProvider,
-                use_vector_db: useVectorDb
+                text: claim,
+                llm_provider: llmProvider,
+                use_vector_db: useVectorDb,
+                openrouter_api_key: SettingsManager.getKey() // Inject dynamic key
             })
         });
 
@@ -386,6 +440,9 @@ async function checkHealth() {
 function init() {
     console.log('[init] Initializing Sinhala Fake News Detector');
     console.log('[init] API URL:', API_BASE);
+
+    // Initialize Settings
+    SettingsManager.init();
 
     // Check API health
     checkHealth().then(healthy => {

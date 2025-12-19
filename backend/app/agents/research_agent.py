@@ -126,7 +126,7 @@ Claim:
         self.model = "alibaba/tongyi-deepresearch-30b-a3b"
         print("[ResearchAgent] Initialized with DeepResearch model")
     
-    def research(self, claim: str) -> Optional[Dict]:
+    def research(self, claim: str, api_key: str = None) -> Optional[Dict]:
         """
         Execute research on the claim and return structured evidence JSON.
         
@@ -138,14 +138,17 @@ Claim:
         """
         print(f"[ResearchAgent] Starting research for: {claim[:80]}...")
         
-        if not self.api_key:
+        # Use passed API key or fallback to env var
+        current_api_key = api_key if api_key else self.api_key
+        
+        if not current_api_key:
             print("[ResearchAgent] No API key, cannot perform research")
             return self._create_empty_result(claim)
         
         user_prompt = self.USER_PROMPT_TEMPLATE.format(claim=claim)
         
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {current_api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://sinhala-fake-news-detector.com",
             "X-Title": "Sinhala Fake News Detector"

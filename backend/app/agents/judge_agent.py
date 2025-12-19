@@ -109,7 +109,7 @@ EVIDENCE_JSON:
         self.model = "alibaba/tongyi-deepresearch-30b-a3b"
         print("[JudgeAgent] Initialized with DeepResearch model")
     
-    def judge(self, evidence_json: Dict) -> Dict:
+    def judge(self, evidence_json: Dict, api_key: str = None) -> Dict:
         """
         Judge the claim based on the evidence and produce a Sinhala verdict.
         
@@ -121,7 +121,10 @@ EVIDENCE_JSON:
         """
         print("[JudgeAgent] Starting judgment...")
         
-        if not self.api_key:
+        # Use passed API key or fallback to env var
+        current_api_key = api_key if api_key else self.api_key
+        
+        if not current_api_key:
             print("[JudgeAgent] No API key, returning default verdict")
             return self._create_default_verdict(evidence_json)
         
@@ -130,7 +133,7 @@ EVIDENCE_JSON:
         user_prompt = self.USER_PROMPT_TEMPLATE.format(evidence_json=evidence_str)
         
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {current_api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://sinhala-fake-news-detector.com",
             "X-Title": "Sinhala Fake News Detector"
