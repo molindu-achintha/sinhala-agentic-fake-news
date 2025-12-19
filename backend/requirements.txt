@@ -20,10 +20,12 @@ deep-translator==1.11.4
 beautifulsoup4
 lxml
 
-# Optional: caching (graceful fallback if not available)
+# Optional: caching 
 redis==5.0.1
 psycopg2-binary==2.9.9
 
 # Utilities
 tenacity==8.2.3
 numpy==1.26.2
+
+aiohttp
