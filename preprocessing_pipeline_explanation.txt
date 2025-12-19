@@ -1,0 +1,965 @@
+================================================================================
+        TEXT PREPROCESSING PIPELINE - DETAILED IMPLEMENTATION EXPLANATION
+================================================================================
+                           Sinhala Fake News Detection Project
+                                   December 2024
+================================================================================
+
+This document explains exactly HOW each preprocessing step was implemented
+in this project, with actual code examples and explanations.
+
+
+
+================================================================================
+1. TEXT PREPROCESSING PIPELINE OVERVIEW
+================================================================================
+
+When raw text comes into the system (from CSV files, web scraping, or user
+input), it goes through a preprocessing pipeline before it can be used.
+
+The pipeline has TWO main parts:
+
+PART 1: TEXT NORMALIZATION AND CLEANING
+- Unicode normalization
+- Whitespace cleaning
+- HTML entity decoding
+- Control character removal
+- Character filtering
+- URL and email removal
+
+PART 2: LINGUISTIC ANALYSIS
+- Sentence tokenization
+- Word tokenization
+- POS tagging
+- Named Entity Recognition
+- Claim indicator detection
+- Negation detection
+
+These functions are implemented in three Python files:
+1. backend/app/utils/text_normalize.py
+2. backend/app/utils/sinhala_nlp.py
+3. backend/app/utils/sin_tokenizer.py
+
+
+
+================================================================================
+2. UNICODE NORMALIZATION (NFC)
+================================================================================
+
+2.1 What Is Unicode Normalization?
+----------------------------------
+
+Unicode is a standard for representing text in computers. But the same
+character can sometimes be represented in different ways:
+
+EXAMPLE:
+The character "ේ" (Sinhala vowel sign) can be stored as:
+- A single combined character (composed)
+- Or as base character + combining mark (decomposed)
+
+When comparing or searching text, these different representations cause
+problems because:
+- "කේ" (composed) != "කේ" (decomposed) in computer comparison
+- Even though they look identical to humans!
+
+
+2.2 How I Implemented It
+------------------------
+
+I use Python's unicodedata library with NFKC normalization:
+
+CODE (from text_normalize.py):
+```python
+import unicodedata
+
+def normalize_text(text: str) -> str:
+    """
+    Normalize unicode characters and remove invisible characters.
+    """
+    if not text:
+        return ""
+    
+    # NFKC = Compatibility Composition
+    # This converts all characters to their canonical composed form
+    text = unicodedata.normalize('NFKC', text)
+    text = text.strip()
+    return text
+```
+
+WHY NFKC?
+- NFC = Canonical Composition (most common form)
+- NFKC = Compatibility Composition (also normalizes special variants)
+- NFKC handles more edge cases like:
+  - Fullwidth characters (ＡＢＣ → ABC)
+  - Special symbols
+  - Ligatures
+
+
+2.3 Example
+-----------
+
+BEFORE NORMALIZATION:
+- Text with decomposed characters
+- Text with fullwidth numbers "１２３"
+- Text with special spaces
+
+AFTER NORMALIZATION:
+- All characters in composed form
+- Numbers as "123"
+- Standard spaces
+
+
+
+================================================================================
+3. WHITESPACE CLEANING
+================================================================================
+
+3.1 Why Clean Whitespace?
+-------------------------
+
+Scraped web content often has messy whitespace:
+- Multiple consecutive spaces
+- Tab characters (\t)
+- Newline characters (\n)
+- Leading/trailing spaces
+- Non-breaking spaces (&nbsp;)
+
+
+3.2 How I Implemented It
+------------------------
+
+CODE (from text_normalize.py):
+```python
+import re
+
+def preprocess_for_indexing(text: str) -> str:
+    """Remove extra whitespace and clean text."""
+    
+    # Remove multiple spaces -> single space
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove multiple newlines -> single newline
+    text = re.sub(r'\n+', '\n', text)
+    
+    # Strip leading/trailing whitespace
+    text = text.strip()
+    
+    return text
+```
+
+REGEX EXPLANATION:
+- \s+ matches one or more whitespace characters (space, tab, newline)
+- Replaced with single space ' '
+- This collapses all sequences of whitespace into one space
+
+
+3.3 Example
+-----------
+
+INPUT:
+"ජනාධිපති    ගියා     කොළඹට        "
+
+OUTPUT:
+"ජනාධිපති ගියා කොළඹට"
+
+
+
+================================================================================
+4. HTML ENTITY DECODING
+================================================================================
+
+4.1 What Are HTML Entities?
+---------------------------
+
+When text is scraped from websites, it may contain HTML entities:
+- &amp;   → &
+- &nbsp;  → (non-breaking space)
+- &lt;    → <
+- &gt;    → >
+- &quot;  → "
+- &#8220; → " (smart quote)
+
+
+4.2 How I Handle This
+---------------------
+
+The NFKC Unicode normalization handles most HTML entities automatically.
+For remaining cases, I use pattern removal:
+
+CODE:
+```python
+# Remove common header/footer patterns that include HTML
+header_patterns = [
+    r'&nbsp;',     # Non-breaking space
+    r'&amp;',      # Ampersand
+    # ... other patterns
+]
+
+for pattern in header_patterns:
+    text = re.sub(pattern, ' ', text, flags=re.IGNORECASE)
+```
+
+
+4.3 Example
+-----------
+
+INPUT:
+"Price &gt; Rs. 100 &amp; VAT included"
+
+OUTPUT:
+"Price > Rs. 100 & VAT included"
+
+
+
+================================================================================
+5. CONTROL CHARACTER REMOVAL
+================================================================================
+
+5.1 What Are Control Characters?
+--------------------------------
+
+Control characters are invisible characters used for text formatting:
+- \x00 (null character)
+- \x0B (vertical tab)
+- \x0C (form feed)
+- Zero-width spaces (\u200B)
+- Right-to-left marks (\u200F)
+
+These can cause problems in text processing and should be removed.
+
+
+5.2 How I Handle This
+---------------------
+
+The NFKC normalization removes most control characters.
+Additionally, my text filtering step ensures only valid characters remain:
+
+CODE (from text_normalize.py):
+```python
+# Check if text has enough Sinhala characters
+# This implicitly filters out texts that are mostly control characters
+sinhala_chars = len(re.findall(r'[\u0D80-\u0DFF]', text))
+total_chars = len(text.replace(' ', ''))
+
+if total_chars > 0:
+    sinhala_ratio = sinhala_chars / total_chars
+    if sinhala_ratio < 0.3:  # At least 30% Sinhala
+        return False  # Reject this text
+```
+
+
+
+================================================================================
+6. CHARACTER FILTERING
+================================================================================
+
+6.1 What Characters Do I Keep?
+------------------------------
+
+I keep only relevant characters for Sinhala fake news detection:
+
+KEPT CHARACTERS:
+- Sinhala Unicode range: \u0D80-\u0DFF (all Sinhala characters)
+- English letters: a-z, A-Z (for mixed content)
+- Numbers: 0-9
+- Basic punctuation: . , ? ! " ' ( )
+
+
+6.2 How I Implemented It
+------------------------
+
+CODE (from sin_tokenizer.py):
+```python
+import re
+
+def tokenize(text: str) -> list[str]:
+    """
+    Simple whitespace and punctuation based tokenizer for Sinhala.
+    """
+    # Remove punctuation but keep Sinhala Unicode range
+    # \u0D80-\u0DFF is the Sinhala Unicode block
+    text = re.sub(r'[^\w\s\u0D80-\u0DFF]', ' ', text)
+    tokens = text.split()
+    return tokens
+```
+
+REGEX EXPLANATION:
+- [^\w\s\u0D80-\u0DFF] matches any character that is NOT:
+  - \w (word character: a-z, A-Z, 0-9, _)
+  - \s (whitespace)
+  - \u0D80-\u0DFF (Sinhala characters)
+- These unwanted characters are replaced with space
+
+
+6.3 Sinhala Unicode Range
+-------------------------
+
+The Sinhala script occupies Unicode range U+0D80 to U+0DFF:
+
++----------------+-------------------+
+| Range          | Characters        |
++----------------+-------------------+
+| U+0D80-U+0D84  | Control/signs     |
+| U+0D85-U+0D96  | Vowels (අ-ඖ)      |
+| U+0D9A-U+0DB1  | Consonants (ක-න)  |
+| U+0DB3-U+0DBB  | Consonants (ඳ-ර)  |
+| U+0DBD         | Consonant (ල)     |
+| U+0DC0-U+0DC6  | Consonants (ව-ෆ)  |
+| U+0DCA         | Al-Lakuna (්)     |
+| U+0DCF-U+0DD4  | Vowel signs       |
+| U+0DD6-U+0DDF  | Vowel signs       |
+| U+0DF2-U+0DF4  | Special chars     |
++----------------+-------------------+
+
+
+
+================================================================================
+7. SENTENCE TOKENIZATION
+================================================================================
+
+7.1 What Is Sentence Tokenization?
+----------------------------------
+
+Sentence tokenization splits text into individual sentences.
+This is important because:
+- Claims are usually single sentences
+- Embedding works better on sentence level
+- Easier to find specific facts
+
+
+7.2 How I Implemented It
+------------------------
+
+CODE (from sin_tokenizer.py):
+```python
+import re
+
+def split_sentences(text: str) -> list[str]:
+    """
+    Split text into sentences based on punctuation.
+    """
+    # Sinhala uses '.', '?', '!' similar to English
+    # (?<=[.?!]) is a lookbehind - matches after punctuation
+    # \s+ matches spaces after punctuation
+    sentences = re.split(r'(?<=[.?!])\s+', text)
+    return [s.strip() for s in sentences if s.strip()]
+```
+
+REGEX EXPLANATION:
+- (?<=[.?!]) is a "positive lookbehind"
+- It matches a position that comes AFTER . ? or !
+- \s+ matches the space(s) following the punctuation
+- Result: split at the space after sentence-ending punctuation
+
+
+7.3 Example
+-----------
+
+INPUT:
+"ජනාධිපති කොළඹ ගියා. ඔහු රැස්වීමක් පැවැත්වුවා. විදේශ ඇමති සහභාගි වුණා."
+
+OUTPUT:
+[
+    "ජනාධිපති කොළඹ ගියා.",
+    "ඔහු රැස්වීමක් පැවැත්වුවා.",
+    "විදේශ ඇමති සහභාගි වුණා."
+]
+
+
+7.4 Handling Edge Cases
+-----------------------
+
+ABBREVIATIONS:
+The current implementation may incorrectly split on abbreviations like "Dr."
+or "Rs." For production, you would add rules to handle these:
+
+```python
+# Example: Don't split on common abbreviations
+abbrevs = ['Dr\.', 'Mr\.', 'Mrs\.', 'Rs\.', 'No\.']
+for abbr in abbrevs:
+    text = text.replace(abbr, abbr.replace('.', '<DOT>'))
+# ... split sentences ...
+# ... restore dots in abbreviations ...
+```
+
+
+
+================================================================================
+8. WORD TOKENIZATION USING SINLING
+================================================================================
+
+8.1 What Is Word Tokenization?
+------------------------------
+
+Word tokenization splits text into individual words (tokens).
+This is the foundation for all further NLP analysis.
+
+
+8.2 The Sinling Library
+-----------------------
+
+Sinling is a Python library specifically designed for Sinhala NLP.
+It provides:
+- Tokenizer designed for Sinhala script
+- POS tagger trained on Sinhala data
+- Stemmer for Sinhala morphology
+
+Installation: pip install sinling
+
+Import:
+```python
+from sinling import SinhalaTokenizer, POSTagger, SinhalaStemmer
+```
+
+
+8.3 How I Use Sinling for Tokenization
+--------------------------------------
+
+CODE (from sinhala_nlp.py):
+```python
+from sinling import SinhalaTokenizer
+
+class SinhalaNLP:
+    def __init__(self):
+        self.tokenizer = SinhalaTokenizer()
+    
+    def tokenize(self, text: str) -> List[str]:
+        """Tokenize Sinhala text into words."""
+        if self.tokenizer:
+            return self.tokenizer.tokenize(text)
+        else:
+            # Fallback: Simple regex-based tokenization
+            return re.findall(r'[\u0D80-\u0DFF]+|[a-zA-Z]+|\d+', text)
+```
+
+
+8.4 Fallback Tokenization
+-------------------------
+
+If Sinling is not installed, I use a regex-based fallback:
+
+```python
+# Matches:
+# [\u0D80-\u0DFF]+ = one or more Sinhala characters
+# [a-zA-Z]+        = one or more English letters
+# \d+              = one or more digits
+tokens = re.findall(r'[\u0D80-\u0DFF]+|[a-zA-Z]+|\d+', text)
+```
+
+
+8.5 Example
+-----------
+
+INPUT:
+"ජනාධිපති රනිල් 2023 ජනවාරි"
+
+OUTPUT:
+["ජනාධිපති", "රනිල්", "2023", "ජනවාරි"]
+
+
+
+================================================================================
+9. POS TAGGING (PART-OF-SPEECH)
+================================================================================
+
+9.1 What Is POS Tagging?
+------------------------
+
+POS tagging assigns a grammatical label to each word:
+- Noun (NN): person, place, thing
+- Verb (VB): action word
+- Adjective (JJ): describing word
+- etc.
+
+
+9.2 The POS Tags I Use
+----------------------
+
++------+------------------+--------------------------------+
+| Tag  | Meaning          | Sinhala Example                |
++------+------------------+--------------------------------+
+| NN   | Common Noun      | පොත (book), රට (country)        |
+| NNP  | Proper Noun      | රනිල් (Ranil), කොළඹ (Colombo)    |
+| VB   | Verb             | ගියා (went), කළා (did)          |
+| VFM  | Finite Verb      | කරයි (does)                    |
+| JJ   | Adjective        | ලස්සන (beautiful)               |
+| RB   | Adverb           | ඉක්මනින් (quickly)              |
+| PP   | Postposition     | සමඟ (with), ගැන (about)         |
+| CC   | Conjunction      | සහ (and), නමුත් (but)           |
+| PRP  | Pronoun          | ඔහු (he), ඇය (she)             |
+| CD   | Cardinal Number  | 1, 2, 3, දහස (thousand)        |
+| RP   | Particle         | ම (emphasis), ත් (also)         |
++------+------------------+--------------------------------+
+
+
+9.3 How I Implemented POS Tagging
+---------------------------------
+
+CODE (from sinhala_nlp.py):
+```python
+from sinling import POSTagger
+
+class SinhalaNLP:
+    def __init__(self):
+        self.tokenizer = SinhalaTokenizer()
+        self.pos_tagger = POSTagger()
+    
+    def pos_tag(self, text: str) -> List[Tuple[str, str]]:
+        """
+        Perform Part-of-Speech tagging on Sinhala text.
+        Returns list of (word, tag) tuples.
+        """
+        if self.pos_tagger:
+            tokens = self.tokenize(text)
+            return self.pos_tagger.predict(tokens)
+        else:
+            # Fallback: Simple rule-based tagging
+            tokens = self.tokenize(text)
+            tagged = []
+            for token in tokens:
+                tag = self._rule_based_pos(token)
+                tagged.append((token, tag))
+            return tagged
+```
+
+
+9.4 Rule-Based Fallback for POS
+-------------------------------
+
+If Sinling is not available, I use simple rules:
+
+```python
+def _rule_based_pos(self, word: str) -> str:
+    """Simple rule-based POS fallback."""
+    
+    # Numbers -> Cardinal
+    if re.match(r'\d+', word):
+        return 'CD'
+    
+    # Common verb endings in Sinhala
+    if word.endswith(('යි', 'නවා', 'මින්', 'ලා')):
+        return 'VB'
+    
+    # Common adjective endings
+    if word.endswith(('ම', 'ක්', 'ය')):
+        return 'JJ'
+    
+    # Default to noun
+    return 'NN'
+```
+
+SINHALA VERB ENDINGS:
+- යි = present tense ("කරයි" = does)
+- නවා = present/future ("කරනවා" = doing/will do)
+- මින් = continuous ("කරමින්" = while doing)
+- ලා = past ("කළා" = did)
+
+
+9.5 Example POS Tagging
+-----------------------
+
+INPUT: "ජනාධිපති රනිල් අද කොළඹ ගියා"
+
+OUTPUT:
+[
+    ("ජනාධිපති", "NN"),    # President (common noun)
+    ("රනිල්", "NNP"),     # Ranil (proper noun)
+    ("අද", "RB"),         # today (adverb)
+    ("කොළඹ", "NNP"),      # Colombo (proper noun)
+    ("ගියා", "VB")        # went (verb)
+]
+
+
+9.6 How POS Tags Are Used in Fact-Checking
+------------------------------------------
+
+PURPOSE 1: EXTRACT KEY NOUNS
+The system extracts nouns (NN, NNP) to find the main entities:
+```python
+nouns = [word for word, tag in pos_tags if tag in ['NN', 'NNP']]
+# Result: ["ජනාධිපති", "රනිල්", "කොළඹ"]
+```
+
+PURPOSE 2: EXTRACT VERBS
+Verbs indicate what action is claimed:
+```python
+verbs = [word for word, tag in pos_tags if tag == 'VB']
+# Result: ["ගියා"]
+```
+
+PURPOSE 3: CLAIM ANALYSIS
+Claims typically have a subject (noun) + verb structure:
+"Someone did something" → NOUN + VERB
+
+
+
+================================================================================
+10. NAMED ENTITY RECOGNITION (NER)
+================================================================================
+
+10.1 What Is NER?
+-----------------
+
+NER identifies and classifies named entities in text:
+- PERSON: Names of people
+- LOCATION: Places
+- ORGANIZATION: Companies, institutions
+- DATE: Time expressions
+- NUMBER: Numerical values
+
+
+10.2 How I Implemented NER
+--------------------------
+
+I use a rule-based approach with pattern matching:
+
+CODE (from sinhala_nlp.py):
+```python
+class SinhalaNLP:
+    def __init__(self):
+        # Named Entity patterns for Sinhala (Rule-based)
+        self.entity_patterns = {
+            'PERSON': [
+                r'මහතා',      # Mr.
+                r'මහත්මිය',    # Mrs.
+                r'ජනාධිපති',   # President
+                r'අගමැති',     # Prime Minister
+                r'මැති',       # Minister
+                r'ඇමති',       # Minister
+                r'ආචාර්ය',     # Doctor
+            ],
+            'LOCATION': [
+                r'ප්‍රදේශය',     # area
+                r'නගරය',       # city
+                r'දිස්ත්‍රික්ක',  # district
+                r'පළාත',       # province
+                r'කොළඹ',       # Colombo
+                r'මහනුවර',      # Kandy
+                r'ගාල්ල',       # Galle
+            ],
+            'ORGANIZATION': [
+                r'සමාගම',       # company
+                r'බැංකුව',      # bank
+                r'රජය',        # government
+                r'අමාත්‍යාංශය', # ministry
+                r'පොලිසිය',    # police
+            ],
+            'DATE': [
+                r'\d{4}[-/]\d{1,2}[-/]\d{1,2}',  # Date formats
+                r'ජනවාරි|පෙබරවාරි|මාර්තු...',   # Month names
+            ],
+        }
+    
+    def extract_entities(self, text: str) -> Dict[str, List[str]]:
+        """Extract named entities from Sinhala text."""
+        entities = {etype: [] for etype in self.entity_patterns.keys()}
+        
+        for entity_type, patterns in self.entity_patterns.items():
+            for pattern in patterns:
+                matches = re.findall(pattern, text)
+                entities[entity_type].extend(matches)
+        
+        # Also find English proper nouns (capitalized words)
+        english_proper = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text)
+        entities['PERSON'].extend(english_proper)
+        
+        # Remove duplicates
+        for entity_type in entities:
+            entities[entity_type] = list(set(entities[entity_type]))
+        
+        return entities
+```
+
+
+10.3 Example NER
+----------------
+
+INPUT: "ජනාධිපති රනිල් අද කොළඹ ගියා"
+
+OUTPUT:
+{
+    "PERSON": ["ජනාධිපති"],
+    "LOCATION": ["කොළඹ"],
+    "ORGANIZATION": [],
+    "DATE": [],
+    "NUMBER": []
+}
+
+
+10.4 How NER Is Used
+--------------------
+
+PURPOSE 1: SEARCH ENHANCEMENT
+When searching for related news, the system uses entity names:
+"Find other news about රනිල් and කොළඹ"
+
+PURPOSE 2: FACT VERIFICATION
+Named entities make claims more specific and verifiable:
+- "President visited Colombo" (specific, verifiable)
+- "Someone went somewhere" (vague, not verifiable)
+
+
+
+================================================================================
+11. CLAIM INDICATOR DETECTION
+================================================================================
+
+11.1 What Are Claim Indicators?
+-------------------------------
+
+Claim indicators are words that suggest a sentence contains a fact-checkable
+claim rather than just description or opinion.
+
+
+11.2 Sinhala Claim Indicator Words
+----------------------------------
+
+CODE (from sinhala_nlp.py):
+```python
+# Claim indicator keywords (for fact-check relevance)
+self.claim_indicators = [
+    'ප්‍රකාශ කළේය',  # stated
+    'සඳහන් කළේය',   # mentioned
+    'පවසයි',        # says
+    'කියා',         # that/said
+    'අනුව',         # according to
+    'වාර්තා',       # report
+    'අනාවරණය',     # revealed
+    'තහවුරු',       # confirmed
+    'ප්‍රකාශයට',     # to the statement
+    'හෙළි'          # disclosed
+]
+```
+
+
+11.3 Detection Function
+-----------------------
+
+```python
+def detect_claim_indicators(self, text: str) -> List[str]:
+    """Find phrases that indicate factual claims."""
+    found = []
+    for indicator in self.claim_indicators:
+        if indicator in text:
+            found.append(indicator)
+    return found
+```
+
+
+11.4 Example
+------------
+
+INPUT: "ජනාධිපති පැවසූවේ ඉන්ධන මිල ඉහළ යන බව ය"
+(Translation: "The President said that fuel prices will increase")
+
+CLAIM INDICATORS FOUND: ["පැවසූවේ", "බව"]
+
+HAS CLAIM: TRUE
+
+
+11.5 How This Is Used
+---------------------
+
+The system uses this to:
+1. Prioritize fact-checkable sentences
+2. Identify reported speech claims
+3. Filter out non-claim content (descriptions, opinions)
+
+
+
+================================================================================
+12. NEGATION DETECTION
+================================================================================
+
+12.1 Why Detect Negation?
+-------------------------
+
+Negation changes the meaning of a sentence completely:
+- "Prices will increase" → positive claim
+- "Prices will NOT increase" → negative claim (opposite meaning)
+
+
+12.2 Sinhala Negation Words
+---------------------------
+
+CODE (from sinhala_nlp.py):
+```python
+# Negation words
+self.negation_words = [
+    'නැත',   # not (formal)
+    'නොවේ',  # is not
+    'නෑ',    # no (informal spoken)
+    'එපා',   # don't (imperative)
+    'බැහැ',   # cannot (spoken)
+    'නොමැත'  # does not exist
+]
+```
+
+
+12.3 Detection Function
+-----------------------
+
+```python
+def detect_negation(self, text: str) -> bool:
+    """Check if text contains negation."""
+    for neg in self.negation_words:
+        if neg in text:
+            return True
+    return False
+```
+
+
+12.4 Example
+------------
+
+INPUT 1: "ඉන්ධන මිල ඉහළ යයි"
+(Translation: "Fuel prices will increase")
+NEGATION: FALSE
+
+INPUT 2: "ඉන්ධන මිල ඉහළ යන්නේ නැත"
+(Translation: "Fuel prices will NOT increase")
+NEGATION: TRUE
+
+
+12.5 How This Is Used
+---------------------
+
+When comparing claims:
+- Claim A: "Prices will increase"
+- Claim B: "Prices will not increase" (has negation)
+
+The system knows these are OPPOSITE claims, not matches.
+
+
+
+================================================================================
+13. PUTTING IT ALL TOGETHER - THE ANALYSIS FUNCTION
+================================================================================
+
+The SinhalaNLP class has a function that performs complete analysis:
+
+CODE:
+```python
+def analyze_sentence(self, sentence: str) -> Dict:
+    """
+    Comprehensive analysis of a single sentence.
+    Returns structured information about the sentence.
+    """
+    tokens = self.tokenize(sentence)
+    pos_tags = self.pos_tag(sentence)
+    entities = self.extract_entities(sentence)
+    
+    # Extract nouns and verbs
+    nouns = [word for word, tag in pos_tags if tag in ['NN', 'NNP']]
+    verbs = [word for word, tag in pos_tags if tag == 'VB']
+    
+    # Stem important words
+    stemmed_nouns = [self.stem(n) for n in nouns]
+    
+    return {
+        'tokens': tokens,
+        'token_count': len(tokens),
+        'pos_tags': pos_tags,
+        'entities': entities,
+        'nouns': nouns,
+        'verbs': verbs,
+        'stemmed_nouns': stemmed_nouns,
+        'has_claim_indicator': len(self.detect_claim_indicators(sentence)) > 0,
+        'has_negation': self.detect_negation(sentence),
+        'claim_indicators': self.detect_claim_indicators(sentence)
+    }
+```
+
+
+EXAMPLE OUTPUT:
+
+INPUT: "ජනාධිපති පැවසූවේ ඉන්ධන මිල ඉහළ නොයන බව ය"
+
+OUTPUT:
+{
+    'tokens': ['ජනාධිපති', 'පැවසූවේ', 'ඉන්ධන', 'මිල', 'ඉහළ', 'නොයන', 'බව', 'ය'],
+    'token_count': 8,
+    'pos_tags': [('ජනාධිපති', 'NN'), ('පැවසූවේ', 'VB'), ...],
+    'entities': {'PERSON': ['ජනාධිපති'], 'LOCATION': [], ...},
+    'nouns': ['ජනාධිපති', 'ඉන්ධන', 'මිල'],
+    'verbs': ['පැවසූවේ', 'නොයන'],
+    'has_claim_indicator': True,
+    'has_negation': True,
+    'claim_indicators': ['පැවසූවේ', 'බව']
+}
+
+
+
+================================================================================
+14. HOW PREPROCESSING IS USED IN THE VERIFICATION PIPELINE
+================================================================================
+
+14.1 In Claim Decomposition
+---------------------------
+
+When a user submits a claim, the ClaimDecomposer:
+1. Normalizes the text
+2. Tokenizes into sentences
+3. Extracts key nouns for search queries
+4. Detects claim indicators
+
+CODE (from claim_decomposer.py):
+```python
+from app.utils.text_normalize import normalize_text
+from app.utils.sinhala_nlp import get_sinhala_nlp
+
+nlp = get_sinhala_nlp()
+normalized_claim = normalize_text(user_claim)
+analysis = nlp.analyze_sentence(normalized_claim)
+key_entities = analysis['nouns'] + list(analysis['entities']['PERSON'])
+```
+
+
+14.2 In Document Preprocessing
+------------------------------
+
+When indexing documents to Pinecone:
+
+CODE (from preprocess.py):
+```python
+from app.utils.text_normalize import normalize_text
+from app.utils.sinhala_nlp import get_sinhala_nlp
+
+nlp = get_sinhala_nlp()
+
+for document in documents:
+    # Normalize
+    text = normalize_text(document.content)
+    
+    # Full NLP analysis
+    pos_tags = nlp.pos_tag(text)
+    entities = nlp.extract_entities(text)
+    has_claim = len(nlp.detect_claim_indicators(text)) > 0
+    
+    # Store with metadata
+    doc_data = {
+        'text': text,
+        'entities': entities,
+        'nouns': [w for w, t in pos_tags if t == 'NN'],
+        'has_claim_indicator': has_claim
+    }
+```
+
+
+14.3 In Search Query Formation
+------------------------------
+
+When searching for evidence:
+
+```python
+# Extract key terms for search
+nouns = analysis['nouns']
+entities = analysis['entities']['PERSON'] + analysis['entities']['LOCATION']
+search_query = ' '.join(nouns[:3] + entities[:2])
+```
+
+
+
+================================================================================
+                    END OF PREPROCESSING PIPELINE EXPLANATION
+================================================================================
