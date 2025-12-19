@@ -47,7 +47,6 @@ class VerdictAgent:
         reasoning: dict = None, 
         evidence: list = None,
         web_analysis: dict = None,
-        web_analysis: dict = None,
         llm_provider: str = "deepresearch",
         api_key: str = None
     ) -> dict:
