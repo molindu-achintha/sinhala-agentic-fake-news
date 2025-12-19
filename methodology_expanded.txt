@@ -1,0 +1,280 @@
+================================================================================
+        CHAPTER 4: METHODOLOGY - EXTENDED & DETAILED THESIS VERSION
+================================================================================
+                           Sinhala Agentic Fake News Detection
+                                   December 2024
+================================================================================
+
+4.1 INTRODUCTION TO THE METHODOLOGY
+===================================
+
+This chapter presents the comprehensive methodology employed to design,
+implement, and validate an "Agentic Fake News Detection System" specifically
+tailored for the Sinhala language.
+
+The core innovation of this research is the transition from traditional "Static
+Classification" to a "Dynamic Agentic Pipeline."
+
+4.1.1 The Shift from Passive Classification to Active Investigation
+-------------------------------------------------------------------
+Conventional approaches to fake news detection typically employ supervised
+learning models (e.g., LSTM, BERT, XLM-R) trained on static datasets. While
+these models achieve high accuracy on benchmark datasets, they suffer from
+fundamental limitations in real-world deployment:
+
+1.  **The Frozen Knowledge Problem**: A model trained on data from 2022 cannot
+    verify a fake news story about a 2024 election. It has a "knowledge cutoff"
+    and lacks awareness of current events.
+2.  **Lack of Evidence**: Traditional classifiers output a probability score
+    (e.g., "Fake: 0.98") but cannot explain *why*, nor can they cite external
+    sources.
+3.  **Hallucination**: Large Language Models (LLMs) used directly for fact-
+    checking often invent plausible-sounding but false explanations.
+
+To address these critical flaws, this research proposes a **Two-Stage Agentic
+Pipeline** that mimics the cognitive workflow of a professional human fact-
+checker. Instead of asking a model "Is this true?", the system assigns autonomous
+agents to "Go find evidence" and then "Judge the evidence."
+
+This methodology prioritizes **Explicability** (explaining why), **Freshness**
+(using live data), and **Verifiability** (citing sources).
+
+
+4.2 SYSTEM ARCHITECTURE OVERVIEW
+================================
+
+The system architecture is built upon the **"Orchestrator-Worker"** design pattern,
+where a central controller manages specialized AI agents.
+
+4.2.1 High-Level Components
+---------------------------
+The architecture is divided into three distinct layers:
+
+1.  **The Interaction Layer**: Handling user input (claims in Sinhala/English)
+    and presenting results.
+2.  **The Agentic Core (The "Brain")**:
+    *   **Orchestrator**: Manages the flow between agents.
+    *   **Research Agent (Worker 1)**: The "Investigator" – responsible for
+        searching, reading, and extracting facts.
+    *   **Judge Agent (Worker 2)**: The "Adjudicator" – responsible for
+        evaluating evidence and producing a verdict.
+3.  **The Knowledge Layer**:
+    *   **Vector Database (Pinecone)**: Long-term memory containing 5,000+
+        verified articles.
+    *   **Live Web Search**: Real-time access to the internet via DeepResearch APIs.
+
+4.2.2 Separation of Concerns
+----------------------------
+A crucial methodological decision was the **Strict Separation of Duties**:
+- The agent that *searches* for information is NOT allowed to *decide* the verdict.
+- The agent that *decides* the verdict is NOT allowed to *invent* new information.
+
+This separation minimizes "confirmation bias" (where a model might search only
+for information that supports its initial guess) and reduces hallucination triggers.
+
+
+4.3 CLAIM PREPROCESSING AND DECOMPOSITION
+=========================================
+
+Real-world user queries are often messy, informal, or linguistically mixed.
+The **ClaimDecomposer** module acts as the entry point, transforming raw text
+into actionable search directives.
+
+4.3.1 Component Identification & Extraction
+-------------------------------------------
+The system parses the raw input string to extract semantic components:
+
+1.  **Keyword Extraction**:
+    *   **Method**: Tokenization followed by Stop-Word Removal (filtering out
+        common Sinhala words like "සහ", "ගැන", "විට").
+    *   **Purpose**: These keywords form the basis of boolean search queries
+        (e.g., `(Ranil OR President) AND (IMF OR Fund)`).
+
+2.  **Named Entity Recognition (NER)**:
+    *   Identifies specific entities (People, Organizations, Locations) crucial
+        to the claim.
+    *   *Example*: In "CID arrested Director", "CID" is a critical entity constraint.
+
+3.  **Temporal Classification**:
+    *   **Logic**: The system scans for temporal markers ("Today", "Yesterday",
+        "2020", "Last year").
+    *   **Routing Decision**:
+        *   *Recent/Future*: Forces a **Live Web Search** execution path.
+        *   *Historical*: Prioritizes **Vector Database** retrieval.
+    *   This ensures efficient resource usage; there is no need to crawl the web
+        for a well-documented rumor from 2019.
+
+4.3.2 Language Normalization & Handling "Singlish"
+--------------------------------------------------
+Sri Lankan social media features heavy use of "Singlish" (Sinhala typed in
+English characters, e.g., "oza boru kiyanawa").
+
+*   **Detection**: Regex-based analysis checks for Sinhala Unicode ranges
+    (`\u0D80-\u0DFF`).
+*   **Normalization Strategy**:
+    *   If **Singlish** is detected: The system calls a translation API to convert
+        it to standardized English for broad searching, and standardized Sinhala
+        for local database searching.
+    *   If **Pure Sinhala** is detected: It is kept as primary, but an English
+        translation is generated to access international news sources (Reuters,
+        BBC) which may have covered the Sri Lankan event.
+
+
+4.4 STAGE 1: RESEARCH AGENT (EVIDENCE GATHERING)
+================================================
+
+The Research Agent is the "eyes and ears" of the system. It replaces the traditional
+"knowledge retrieval" step with an autonomous research process.
+
+4.4.1 Architecture of the Research Agent
+----------------------------------------
+The Research Agent utilizes a specialized Large Language Model (LLM) optimized
+for information retrieval (Alibaba Tongyi DeepResearch-30b).
+
+**System Prompt Engineering**:
+The agent operates under a strict "System Prompt" that defines its boundaries:
+*   *Directive*: "You are an Investigator. You gather facts. You do NOT share opinions."
+*   *Constraint*: "Extract direct quotes and snippets. Do not summarize unless necessary."
+*   *Output Format*: A strict JSON schema containing a list of `EvidenceItem` objects.
+
+4.4.2 The Evidence Collection Process
+-------------------------------------
+1.  **Query Formulation**: The agent converts the decomposed claim into multiple
+    search queries (e.g., one in English for international scope, one in Sinhala
+    for local scope).
+2.  **Multi-Source Retrieval**:
+    *   It queries trusted domains (`.lk` government sites, major news portals).
+    *   It simultaneously queries the internal Pinecone Vector Store.
+3.  **Filtering & Extraction**:
+    *   The agent reads the retrieved content.
+    *   It discards irrelevant results (e.g., opinion blogs).
+    *   It extracts specific sentences that directly support or refute the claim.
+
+4.4.3 Credibility Assessment
+----------------------------
+For each piece of evidence, the Research Agent assigns a metadata tag:
+*   **Official**: Government gazettes, police reports.
+*   **Mainstream**: Established news papers (Lankadeepa, Daily Mirror).
+*   **Social**: Unverified viral posts (labeled 'low credibility').
+This metadata is passed to the Judge Agent to weigh the evidence.
+
+
+4.5 STAGE 2: JUDGE AGENT (VERDICT GENERATION)
+=============================================
+
+The Judge Agent is the cognitive core, replacing the classification head of
+traditional models.
+
+4.5.1 Role and Responsibilities
+-------------------------------
+The Judge Agent acts as an impartial arbiter. It receives the *Case File*
+(the JSON evidence list) from the Research Agent and must render a verdict.
+
+**Input**: A JSON object containing only the claim and the collected 4-5 evidence snippets.
+**Output**: A structured Verdict object (Label, Confidence, Explanation, Citations).
+
+4.5.2 The Verdict Reasoning Logic (Chain of Thought)
+----------------------------------------------------
+The Judge Agent is prompted to follow a specific reasoning chain:
+1.  **Analyze Consistency**: Do the sources agree?
+    *   *Scenario A*: All sources agree → High Confidence.
+    *   *Scenario B*: Sources conflict → Check source types. (Official > Social).
+2.  **Determine Label**:
+    *   **TRUE**: Corroborated by high-credibility sources.
+    *   **FALSE**: Explicitly debunked by high-credibility sources.
+    *   **MISLEADING**: Factually correct but contextually wrong (e.g., old photo used for new event).
+    *   **NEEDS VERIFICATION**: Insufficient or low-quality evidence.
+
+4.5.3 Generating the Sinhala Explanation
+----------------------------------------
+A key requirement for the thesis was **Explainability**. The Judge Agent generates
+a natural language paragraph in Sinhala.
+
+*   **Structure**:
+    1.  Direct Answer ("This is false.")
+    2.  The "Why" ("According to the Police Media Spokesman...")
+    3.  The Context ("This event actually happened in 2018...")
+    4.  Citations ("See sources [1] and [2].")
+
+*   **Citation Enforcement**:
+    The system uses a "Reference Check" post-processing step. If the generated
+    explanation claims a fact but fails to include a `[x]` citation reference
+    linking back to the evidence list, the response can be flagged or regenerated.
+
+
+4.6 HYBRID VERIFICATION STRATEGY
+================================
+
+To balance **Accuracy**, **Speed**, and **Cost**, the system employs a Hybrid
+Strategy for information retrieval.
+
+4.6.1 The "Two-Brain" Approach
+------------------------------
+1.  **The Fast Brain (Vector Memory)**:
+    *   **Technology**: Pinecone Vector Database.
+    *   **Content**: 5,000+ curated, verified articles (Dataset).
+    *   **Mechanism**: Cosine Similarity Search on 1024-dimensional Embeddings.
+    *   **Latency**: <200ms.
+    *   **Use Case**: Breaking recurring rumors, checking against known historical data.
+
+2.  **The Slow Brain (Deep Web Research)**:
+    *   **Technology**: Real-time Web Search via LLM API.
+    *   **Content**: The entire indexed web.
+    *   **Mechanism**: Iterative search-and-read.
+    *   **Latency**: 5-10 seconds.
+    *   **Use Case**: Breaking news, verifying brand new claims.
+
+4.6.2 Dynamic Routing Algorithm
+-------------------------------
+The system logic decides which path to take:
+1.  **Check Cache/Vector DB first**: If a highly similar claim (Similarity > 0.92)
+    is found in the database, the system returns that matched verdict immediately
+    (High efficiency).
+2.  **Fallback to Research**: If no high-confidence match is found (Similarity < 0.92)
+    OR if the user explicitly requested "Live Search", the system triggers the
+    Research Agent.
+
+
+4.7 TECHNOLOGY STACK IMPLEMENTATION
+===================================
+
+The implementation leverages a modern, cloud-native stack:
+
+1.  **Backend Framework**: **FastAPI** (Python). Chosen for its high performance
+    with asynchronous operations (`async/await`), essential for handling
+    concurrent agent operations without blocking.
+2.  **Vector Database**: **Pinecone** (Serverless). Chosen for its scalability
+    and ability to handle hybrid search (combining sparse keyword search with
+    dense semantic search).
+3.  **LLM Interface**: **OpenRouter**. Acts as a gateway, allowing the system
+    to switch between models (DeepResearch, Llama-3, GPT-4o) without code changes.
+4.  **Frontend**: **Vanilla JS + HTML5**. Intentionally kept lightweight to ensure
+    fast loading on mobile networks common in Sri Lanka.
+5.  **Deployment**: **Render.com**. Containerized deployment (Docker) ensuring
+    environment consistency.
+
+
+4.8 SYSTEM LIMITATIONS & ETHICAL DESIGN
+=======================================
+
+4.8.1 Hallucination Control
+---------------------------
+Agents can occasionaly hallucinate. To mitigate this:
+*   **Temperature=0.1**: The models are set to near-deterministic output.
+*   **Grounding**: The Judge Agent is strictly forbidden from using outside knowledge;
+    it must rely *only* on the evidence provided by the Research Agent.
+
+4.8.2 Bias Mitigation
+---------------------
+The system queries a diverse set of sources (both State-run and Private media)
+to present a balanced view, reducing the risk of partisan bias common in
+single-source verification.
+
+
+4.9 CONCLUSION OF METHODOLOGY
+=============================
+
+This methodology represents a significant advancement over static classifiers.
+By simulating the human journalistic process—investigation followed by judgment—
+the system achieves a level of transparency and adaptability that is crucial
+for combating the dynamic nature of misinformation in the digital age.
