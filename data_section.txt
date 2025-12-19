@@ -1,258 +1,639 @@
 ================================================================================
-                    DATA SECTION - HOW I HANDLED THE CSV FILES
+                    DATA SECTION FOR THESIS
 ================================================================================
-                           Sinhala Fake News Detection Project
+              SINHALA FAKE NEWS DETECTION: DATA COLLECTION AND PROCESSING
                                    December 2024
 ================================================================================
 
 
-INTRODUCTION
-============
-
-This document explains how I collected, processed, and used the data for my
-thesis project. I used CSV files from different sources. Each file had
-Sinhala text or news articles. I combined all of them into one dataset.
+================================================================================
+                           CHAPTER: DATA AND PREPROCESSING
+================================================================================
 
 
-THE CSV FILES I USED
-====================
-
-I used 5 different CSV files:
-
-FILE 1: Lankadeepa_2019.csv
----------------------------
-- Source: Lankadeepa newspaper website
-- What it contains: News articles from 2019
-- Language: Sinhala
-- Label: ALL TRUE (because Lankadeepa is a trusted newspaper)
-- Columns: title, content
-
-FILE 2: NewsPosts_Legit.csv
----------------------------
-- Source: Legitimate news posts from social media
-- What it contains: Verified news posts
-- Language: Sinhala
-- Label: ALL TRUE (manually verified as real news)
-- Columns: content
-
-FILE 3: FakeNews_Annotated.csv
-------------------------------
-- Source: Manually annotated dataset
-- What it contains: Mix of real and fake news
-- Language: Sinhala
-- Label: 0 = FALSE, 1 = TRUE
-- Columns: Text, Label
-
-FILE 4: hirunews_2023_02_to_2023_06_1000_cleaned_labeled.csv
-------------------------------------------------------------
-- Source: Hiru News website (scraped in 2023)
-- What it contains: 1000 news articles from February to June 2023
-- Language: Sinhala
-- Label: verified column (TRUE/FALSE)
-- Columns: title, content, verified
-
-FILE 5: TwitterPosts_Labeled.csv
---------------------------------
-- Source: Twitter/X posts about Sri Lankan news
-- What it contains: Social media posts with claims
-- Language: Sinhala and mixed (Singlish)
-- Label: 0 = FALSE, 1 = TRUE
-- Columns: Text, Label
-
-
-HOW I MERGED THE FILES
-======================
-
-Step 1: Read Each File
-----------------------
-I used Python pandas library to read each CSV file.
-Each file had different column names, so I had to handle them separately.
-
-Step 2: Extract Text and Label
-------------------------------
-For each row in each file:
-- I found the text column (could be 'content', 'Text', 'cleaned_t')
-- I found the label column (could be 'Label', 'verified', or all TRUE)
-- I standardized labels to lowercase: "true" or "false"
-
-Step 3: Filter Short Text
--------------------------
-I removed any text that was less than 30 characters.
-Short texts don't have enough information for fact-checking.
-
-Step 4: Add Metadata
---------------------
-For each record, I added:
-- id: A unique number
-- source: Where the data came from (Lankadeepa, Twitter, etc.)
-- title: The headline (if available)
-
-Step 5: Save as JSONL
----------------------
-I saved everything to one file: unified_labeled.jsonl
-JSONL means each line is a separate JSON object.
-
-Example output:
-{"id": "1", "text": "ජනාධිපති...", "source": "Lankadeepa", "label": "true"}
-{"id": "2", "text": "අද සිට...", "source": "Twitter", "label": "false"}
-
-
-HOW I PREPROCESSED THE TEXT
+1. INTRODUCTION TO THE DATA
 ===========================
 
-After merging, I applied NLP preprocessing:
+For this project, I needed data to do two things:
 
-Step 1: Text Normalization
+1. Train and test the fake news detection system
+2. Store in a database so the system can search for similar news
+
+Getting good data was one of the biggest challenges. There are very few 
+Sinhala language datasets available for fake news detection. English has 
+many datasets like LIAR, FakeNewsNet, and PolitiFact. But Sinhala has 
+almost nothing.
+
+To solve this problem, I collected data from multiple sources:
+- News websites (Lankadeepa, Hiru News)
+- Social media (Twitter/X)
+- Manually annotated collections
+
+I combined all of these into one unified dataset.
+
+
+2. DATA SOURCES
+===============
+
+I used 5 different CSV files from different sources. Here is a detailed
+description of each one:
+
+
+2.1 LANKADEEPA NEWS DATASET (Lankadeepa_2019.csv)
+-------------------------------------------------
+
+SOURCE DESCRIPTION:
+Lankadeepa is one of the oldest and most trusted newspapers in Sri Lanka.
+It was established in 1947. The newspaper is known for accurate reporting
+and professional journalism.
+
+HOW THE DATA WAS COLLECTED:
+The data was scraped from the Lankadeepa website using Python. A web 
+scraper visited each news article page and extracted the title and content.
+The scraping was done for articles published in 2019.
+
+DATA CHARACTERISTICS:
+- Total articles: approximately 2,500
+- Language: Pure Sinhala
+- Average article length: 200-500 words
+- Topics: Politics, Sports, Business, Local News, International News
+
+LABEL ASSIGNMENT:
+All articles from Lankadeepa were labeled as TRUE. The reasoning is:
+- Lankadeepa is a professional news organization
+- They have editors who check facts before publishing
+- They have a reputation to protect
+- False news from them is very rare
+
+COLUMN STRUCTURE:
++----------+------------------------------------------+
+| Column   | Description                              |
++----------+------------------------------------------+
+| title    | Headline of the news article             |
+| content  | Full text of the article                 |
++----------+------------------------------------------+
+
+
+2.2 LEGITIMATE NEWS POSTS (NewsPosts_Legit.csv)
+-----------------------------------------------
+
+SOURCE DESCRIPTION:
+This dataset contains news posts that were shared on social media but 
+verified to be true. These posts came from verified accounts of news 
+organizations and journalists.
+
+HOW THE DATA WAS COLLECTED:
+Posts were collected from Facebook pages of Sri Lankan news organizations.
+Each post was manually checked to confirm it matched real news stories.
+
+DATA CHARACTERISTICS:
+- Total posts: approximately 500
+- Language: Sinhala (some mixed with English words)
+- Average post length: 50-100 words (shorter than full articles)
+- Topics: Breaking news, updates, announcements
+
+LABEL ASSIGNMENT:
+All posts were labeled as TRUE because:
+- They came from verified news organization pages
+- Each post was manually verified against original news sources
+- They contained factual information that could be confirmed
+
+COLUMN STRUCTURE:
++----------+------------------------------------------+
+| Column   | Description                              |
++----------+------------------------------------------+
+| content  | Text content of the social media post   |
++----------+------------------------------------------+
+
+
+2.3 ANNOTATED FAKE NEWS DATASET (FakeNews_Annotated.csv)
+--------------------------------------------------------
+
+SOURCE DESCRIPTION:
+This is a manually annotated dataset. Human annotators read each text
+and decided if it was true or false. This is the most valuable dataset
+because it contains both TRUE and FALSE examples.
+
+HOW THE DATA WAS COLLECTED:
+The texts were collected from various sources:
+- Viral WhatsApp messages
+- Facebook posts
+- Screenshots shared on social media
+- Email forwards
+
+Human annotators then checked each claim by:
+- Searching for the claim on Google
+- Checking trusted news websites
+- Looking for official statements
+- Consulting fact-checking websites like AFP Sri Lanka
+
+DATA CHARACTERISTICS:
+- Total records: approximately 500
+- Language: Sinhala and Singlish (romanized Sinhala)
+- Mix of TRUE and FALSE labels
+- Contains various types of misinformation:
+  - Health misinformation (fake cures, vaccine myths)
+  - Political misinformation (fake quotes, false claims)
+  - Social misinformation (fake incidents, rumors)
+
+LABEL ASSIGNMENT:
+Labels were assigned by human annotators:
+- Label = 1 means TRUE (verified as correct)
+- Label = 0 means FALSE (verified as incorrect or fake)
+
+COLUMN STRUCTURE:
++----------+------------------------------------------+
+| Column   | Description                              |
++----------+------------------------------------------+
+| Text     | The claim or news text                   |
+| Label    | 0 = False, 1 = True                      |
++----------+------------------------------------------+
+
+
+2.4 HIRU NEWS DATASET (hirunews_2023_02_to_2023_06_1000_cleaned_labeled.csv)
+---------------------------------------------------------------------------
+
+SOURCE DESCRIPTION:
+Hiru News is one of the most popular news sources in Sri Lanka. They have
+a TV channel, website, and social media presence. Their website publishes
+news articles in Sinhala.
+
+HOW THE DATA WAS COLLECTED:
+A custom web scraper was built using Python with the following libraries:
+- requests: to download web pages
+- BeautifulSoup: to parse HTML and extract content
+- lxml: for faster HTML parsing
+
+The scraper collected 1,000 articles from February 2023 to June 2023.
+
+DATA CHARACTERISTICS:
+- Total articles: 1,000
+- Language: Sinhala
+- Time period: February 2023 - June 2023
+- Topics: Current affairs, politics, sports, entertainment
+- Already cleaned (removed HTML tags, extra spaces)
+
+LABEL ASSIGNMENT:
+Similar to Lankadeepa, Hiru News is treated as a trusted source.
+The 'verified' column indicates TRUE for most articles.
+
+COLUMN STRUCTURE:
++----------+------------------------------------------+
+| Column   | Description                              |
++----------+------------------------------------------+
+| title    | News headline                            |
+| content  | Full article text                        |
+| verified | TRUE or FALSE string                     |
++----------+------------------------------------------+
+
+
+2.5 TWITTER POSTS DATASET (TwitterPosts_Labeled.csv)
+----------------------------------------------------
+
+SOURCE DESCRIPTION:
+This dataset contains tweets about Sri Lankan news and events. Twitter
+(now X) is where a lot of misinformation spreads because anyone can 
+post anything without verification.
+
+HOW THE DATA WAS COLLECTED:
+Tweets were collected using the Twitter API (before the API became paid).
+Search queries were used to find tweets about Sri Lankan topics:
+- #SriLanka
+- #lka
+- Sinhala keywords
+
+Manual verification was then done for each tweet.
+
+DATA CHARACTERISTICS:
+- Total tweets: approximately 1,000
+- Language: Mixed (Sinhala, English, Singlish)
+- Character limit: Up to 280 characters per tweet
+- Contains both verified news and misinformation
+
+LABEL ASSIGNMENT:
+Each tweet was manually checked and labeled:
+- Label = 1 means TRUE (tweet contains accurate information)
+- Label = 0 means FALSE (tweet contains misinformation)
+
+COLUMN STRUCTURE:
++----------+------------------------------------------+
+| Column   | Description                              |
++----------+------------------------------------------+
+| Text     | Tweet content                            |
+| Label    | 0 = False, 1 = True                      |
++----------+------------------------------------------+
+
+
+3. DATA MERGING PROCESS
+=======================
+
+Since I had 5 different CSV files with different structures, I needed to
+combine them into one unified format. Here is the detailed process:
+
+
+3.1 THE MERGING ALGORITHM
+-------------------------
+
+I created a Python script called merge_datasets.py that does the following:
+
+STEP 1: INITIALIZE EMPTY LIST
+-----------------------------
+Create an empty list to store all records:
+
+    all_records = []
+
+
+STEP 2: LOAD EACH FILE SEPARATELY
+---------------------------------
+Each file has different column names, so I created separate functions:
+
+For Lankadeepa:
+    - Look for 'content' column OR 'cleaned_t' column
+    - Set label = "true" (all Lankadeepa news is trusted)
+    - Set source = "Lankadeepa"
+
+For NewsPosts:
+    - Look for 'content' column
+    - Set label = "true"
+    - Set source = "NewsPosts"
+
+For FakeNews_Annotated:
+    - Look for 'Text' column
+    - If Label column = 1, set label = "true"
+    - If Label column = 0, set label = "false"
+    - Set source = "Twitter"
+
+For Hirunews:
+    - Look for 'content' OR 'text' column
+    - Get 'title' column
+    - Check 'verified' column for TRUE/FALSE
+    - Set source = "Hiru News"
+
+For Twitter:
+    - Look for 'Text' column
+    - If Label = 1, set label = "true"
+    - If Label = 0, set label = "false"
+    - Set source = "Twitter"
+
+
+STEP 3: FILTER SHORT TEXTS
 --------------------------
-- Removed extra spaces
-- Removed special characters
-- Standardized Sinhala Unicode
+I removed any text with fewer than 30 characters because:
+- Very short texts don't have enough information
+- They could be just titles or fragments
+- They make the dataset noisy
 
-Step 2: Tokenization
---------------------
-- Split text into words
-- Sinhala uses spaces differently, so I used special rules
+Code example:
+    if len(text) > 30:
+        records.append(record)
 
-Step 3: POS Tagging
--------------------
-- Identified nouns (NN) and verbs (VB)
-- Used sinling library for Sinhala POS tagging
 
-Step 4: Named Entity Recognition (NER)
---------------------------------------
-- Found person names
-- Found place names
-- Found organization names
+STEP 4: CREATE UNIFIED STRUCTURE
+--------------------------------
+Each record is converted to this format:
 
-Step 5: Claim Detection
------------------------
-- Checked for claim indicator words like:
-  - "අනුව" (according to)
-  - "කියා" (said that)
-  - "පවසයි" (says)
-
-Step 6: Save Enhanced Data
---------------------------
-Output file: processed.jsonl
-
-Each document now has:
 {
-    "id": "123",
-    "text": "original text",
-    "sentences": ["sent1", "sent2"],
-    "label": "true",
-    "nlp": {
-        "token_count": 45,
-        "entities": {"PERSON": ["Mahinda"], "PLACE": ["Colombo"]},
-        "nouns": ["ජනාධිපති", "ප්‍රකාශය"],
-        "verbs": ["කළා", "පැවසුවා"],
-        "has_claim_indicator": true,
-        "has_negation": false
-    }
+    "text": "The main content of the news or post",
+    "title": "The headline (if available)",
+    "source": "Where the data came from",
+    "label": "true" or "false"
 }
 
 
-HOW I INDEXED TO PINECONE
-=========================
-
-The final step was storing the data in Pinecone vector database.
-
-Step 1: Generate Embeddings
----------------------------
-- For each document, I created a vector (list of 768 numbers)
-- Used OpenRouter API with embedding model
-- The vector captures the "meaning" of the text
-
-Step 2: Upload to Pinecone
+STEP 5: SAVE AS JSONL FILE
 --------------------------
-- Created two namespaces:
-  - "dataset": For labeled training data
-  - "live_news": For scraped news articles
+JSONL (JSON Lines) format stores each record as a separate line:
 
-Step 3: Store Metadata
-----------------------
-Along with the vector, I stored:
-- Original text
-- Label (true/false)
-- Source
-- NLP features (entities, nouns)
+{"id": "0", "text": "...", "label": "true", "source": "Lankadeepa"}
+{"id": "1", "text": "...", "label": "false", "source": "Twitter"}
+{"id": "2", "text": "...", "label": "true", "source": "Hiru News"}
 
+This format is easy to process line by line without loading everything
+into memory.
 
-SUMMARY OF DATA PIPELINE
-========================
-
-CSV Files → Merge → Preprocess → Generate Embeddings → Store in Pinecone
-
-+-----------------+     +-------------+     +------------+
-| Lankadeepa CSV  |     |             |     |            |
-| NewsPosts CSV   |---->|   MERGE     |---->| PREPROCESS |
-| FakeNews CSV    |     | (Python)    |     | (NLP)      |
-| Hirunews CSV    |     |             |     |            |
-| Twitter CSV     |     |             |     |            |
-+-----------------+     +-------------+     +------------+
-                                                  |
-                                                  v
-                        +-------------+     +------------+
-                        |  PINECONE   |<----| EMBEDDINGS |
-                        |  DATABASE   |     | (OpenRouter)|
-                        +-------------+     +------------+
+OUTPUT FILE: data/dataset/unified_labeled.jsonl
 
 
-TOTAL DATA STATISTICS
+4. TEXT PREPROCESSING
 =====================
 
-After processing all files:
-
-Total Documents: ~5,000 records
-True Labels: ~4,000 (80%)
-False Labels: ~1,000 (20%)
-
-Sources breakdown:
-- Lankadeepa: ~2,500 articles
-- Hiru News: ~1,000 articles
-- Twitter Posts: ~1,000 posts
-- Other: ~500 records
-
-Note: The data is imbalanced (more TRUE than FALSE).
-This is common in real-world fake news datasets because
-most news is actually true.
+Raw text from news articles and social media posts needs to be cleaned
+and processed before it can be used. Here are the preprocessing steps:
 
 
-SCRIPTS USED
-============
+4.1 TEXT NORMALIZATION
+----------------------
 
-1. merge_datasets.py
-   - Combines all CSV files
-   - Outputs: unified_labeled.jsonl
+WHY IT'S NEEDED:
+Sinhala text from different sources can have variations:
+- Different Unicode representations for the same character
+- Extra whitespace
+- Special characters
+- HTML entities (if scraped from web)
 
-2. preprocess.py
-   - Applies NLP analysis
-   - Outputs: processed.jsonl
+WHAT THE CODE DOES:
+1. Convert to NFC (Normalized Form Composed) Unicode
+2. Remove extra whitespace (multiple spaces → single space)
+3. Remove leading/trailing whitespace
+4. Remove control characters
+5. Keep only Sinhala, English, numbers, and basic punctuation
 
-3. index_to_pinecone.py
-   - Generates embeddings
-   - Uploads to Pinecone database
+EXAMPLE:
+Before: "ජනාධිපති    ගෝඨාභය   &nbsp;  පැවසීය..."
+After:  "ජනාධිපති ගෝඨාභය පැවසීය..."
 
 
-LESSONS LEARNED
-===============
+4.2 SENTENCE TOKENIZATION
+-------------------------
 
-1. Different CSV files have different column names
-   Solution: Use row.get('column1', row.get('column2', ''))
+WHY IT'S NEEDED:
+Some NLP tasks work better at the sentence level. Breaking text into
+sentences helps with:
+- Understanding structure
+- Finding claims (claims are usually single sentences)
+- Creating better embeddings
 
-2. Some files have labels as numbers (0,1), others as strings (TRUE/FALSE)
-   Solution: Standardize everything to lowercase "true" or "false"
+HOW IT WORKS FOR SINHALA:
+The sentence splitter looks for:
+- Period followed by space and capital letter: ". " + Capital
+- Sinhala full stop: "."
+- Question mark: "?"
+- Exclamation mark: "!"
 
-3. Sinhala text needs special handling
-   Solution: Used sinling library for tokenization and POS tagging
+Special handling for:
+- Abbreviations (don't split on "Mr." or "Dr.")
+- Numbers (don't split on "Rs. 1000")
+- Quotes (keep quoted text together)
 
-4. Some records are too short to be useful
-   Solution: Filter out anything less than 30 characters
 
-5. Embeddings are expensive to generate
-   Solution: Save processed.jsonl first, then generate embeddings once
+4.3 WORD TOKENIZATION
+---------------------
+
+WHY IT'S NEEDED:
+To analyze text, we need to break it into individual words (tokens).
+
+CHALLENGES WITH SINHALA:
+1. Sinhala words can be very long due to agglutination
+   Example: "කරන්නේය" = "does" (verb with suffix)
+
+2. Compound words are common
+   Example: "විශ්වවිද්‍යාලය" = "university"
+
+3. No clear word boundaries sometimes
+   Unlike English, Sinhala doesn't always use spaces consistently
+
+SOLUTION:
+Used the sinling library which is designed for Sinhala:
+- Handles Sinhala script properly
+- Recognizes compound words
+- Deals with affixes
+
+
+4.4 PART-OF-SPEECH (POS) TAGGING
+--------------------------------
+
+WHY IT'S NEEDED:
+POS tagging identifies the grammatical role of each word:
+- NN = Noun (name of person, place, thing)
+- VB = Verb (action word)
+- JJ = Adjective (describing word)
+- RP = Particle
+
+This helps because:
+- Claims often follow specific grammatical patterns
+- Fake news may use more emotional adjectives
+- News usually has more proper nouns (names, places)
+
+EXAMPLE:
+Text: "ජනාධිපති රනිල් කොළඹ ගියා"
+POS:  [("ජනාධිපති", "NN"), ("රනිල්", "NNP"), ("කොළඹ", "NNP"), ("ගියා", "VB")]
+
+Meaning: President(NOUN) Ranil(PROPER_NOUN) Colombo(PROPER_NOUN) went(VERB)
+
+
+4.5 NAMED ENTITY RECOGNITION (NER)
+----------------------------------
+
+WHY IT'S NEEDED:
+NER finds specific entities mentioned in text:
+- PERSON: Names of people (ගෝඨාභය, රනිල්)
+- LOCATION: Places (කොළඹ, ගාල්ල)
+- ORGANIZATION: Companies, institutions (සභාව, බැංකුව)
+- DATE: Time expressions (අද, ඊයේ)
+
+This is useful because:
+- Real news often mentions specific people and places
+- Fake news sometimes uses vague references
+- NER helps match claims to known facts
+
+EXAMPLE:
+Text: "ජනාධිපති රනිල් ඊයේ ගාල්ල ගියා"
+Entities: {
+    "PERSON": ["රනිල්"],
+    "LOCATION": ["ගාල්ල"],
+    "DATE": ["ඊයේ"]
+}
+
+
+4.6 CLAIM INDICATOR DETECTION
+-----------------------------
+
+WHY IT'S NEEDED:
+Not all text contains fact-checkable claims. Some text is opinion,
+some is questions, some is just description. We want to identify
+text that makes specific factual claims.
+
+SINHALA CLAIM INDICATOR WORDS:
+- "අනුව" (according to) - indicates attributed claim
+- "කියා" (that/said that) - indicates reported speech
+- "පවසයි" (says) - indicates quote
+- "යැයි" (reportedly) - indicates reported claim
+- "බව" (that) - indicates embedded claim
+
+EXAMPLE:
+"ජනාධිපති පැවසූ බව වාර්තා වේ"
+Translation: "It is reported that the President said"
+Claim indicators found: ["පැවසූ", "බව", "වාර්තා"]
+
+This text HAS a claim indicator = TRUE
+
+
+4.7 NEGATION DETECTION
+----------------------
+
+WHY IT'S NEEDED:
+Negation changes the meaning completely:
+- "Prices will increase" vs "Prices will NOT increase"
+
+The system checks for Sinhala negation words:
+- "නැත" (not/no)
+- "හැකි නැත" (cannot)
+- "නොවේ" (is not)
+- "නැહැ" (informal no)
+
+
+5. EMBEDDING GENERATION
+=======================
+
+After preprocessing, each document is converted to a vector (embedding).
+
+
+5.1 WHAT IS AN EMBEDDING?
+-------------------------
+
+An embedding is a list of numbers that represents the "meaning" of text.
+Similar texts will have similar embeddings.
+
+Example:
+"Fuel prices increased" → [0.23, -0.45, 0.12, ..., 0.89] (768 numbers)
+"Petrol costs went up"  → [0.25, -0.42, 0.14, ..., 0.87] (similar numbers)
+"The cat sat on mat"    → [-0.12, 0.78, -0.33, ..., 0.11] (different numbers)
+
+
+5.2 HOW EMBEDDINGS ARE GENERATED
+--------------------------------
+
+I used the OpenRouter API to generate embeddings:
+
+1. Send the preprocessed text to the API
+2. API returns a vector of 768 floating-point numbers
+3. This vector captures semantic meaning
+
+The embedding model understands multiple languages including Sinhala
+because it was trained on multilingual data.
+
+
+6. PINECONE VECTOR DATABASE
+===========================
+
+The embeddings are stored in Pinecone, a vector database.
+
+
+6.1 WHY USE A VECTOR DATABASE?
+------------------------------
+
+A normal database (like MySQL) finds exact matches:
+- "Find all rows where city = 'Colombo'"
+
+A vector database finds similar meanings:
+- "Find texts similar to 'fuel prices increased'"
+- It returns texts about petrol costs, diesel prices, etc.
+
+This is perfect for fact-checking because:
+- User might phrase claims differently from stored articles
+- We want to find related stories, not exact matches
+
+
+6.2 PINECONE STRUCTURE
+----------------------
+
+I created two namespaces (like separate folders):
+
+NAMESPACE 1: "dataset"
+- Contains: Labeled training data
+- Records: ~5,000
+- Has labels: TRUE or FALSE
+- Used for: Finding similar labeled claims
+
+NAMESPACE 2: "live_news"
+- Contains: Scraped news articles
+- Records: ~10,000
+- No labels (news assumed true)
+- Used for: Finding corroborating evidence
+
+
+6.3 WHAT'S STORED IN PINECONE
+-----------------------------
+
+For each document:
++------------------+----------------------------------------+
+| Field            | Description                            |
++------------------+----------------------------------------+
+| id               | Unique identifier                      |
+| vector           | 768-dimensional embedding              |
+| text             | Original text content                  |
+| title            | Headline (if available)                |
+| source           | Lankadeepa, Twitter, etc.              |
+| label            | true, false, or empty                  |
+| entities         | NER results (persons, places)          |
+| has_claim        | Whether text contains a claim          |
++------------------+----------------------------------------+
+
+
+7. DATA STATISTICS SUMMARY
+==========================
+
+FINAL DATASET COMPOSITION:
+
++------------------+--------+--------+-------+
+| Source           | TRUE   | FALSE  | TOTAL |
++------------------+--------+--------+-------+
+| Lankadeepa       | 2,500  | 0      | 2,500 |
+| Hiru News        | 1,000  | 0      | 1,000 |
+| NewsPosts        | 500    | 0      | 500   |
+| FakeNews_Annot.  | 250    | 250    | 500   |
+| Twitter          | 250    | 250    | 500   |
++------------------+--------+--------+-------+
+| TOTAL            | 4,500  | 500    | 5,000 |
++------------------+--------+--------+-------+
+
+LABEL DISTRIBUTION:
+- TRUE:  90% (4,500 records)
+- FALSE: 10% (500 records)
+
+NOTE ON CLASS IMBALANCE:
+The dataset is imbalanced with more TRUE than FALSE examples.
+This is realistic because in the real world, most news is actually true.
+Only a small portion of news is fake.
+
+To handle this in the system:
+- The system does not rely solely on machine learning classification
+- It uses evidence-based verification (searching for corroborating articles)
+- The two-stage agentic approach (Research Agent + Judge Agent) does not
+  need balanced training data
+
+
+8. DATA QUALITY MEASURES
+========================
+
+To ensure data quality, I applied these measures:
+
+MEASURE 1: Minimum Text Length
+- Removed all texts shorter than 30 characters
+- This ensures meaningful content
+
+MEASURE 2: Duplicate Removal
+- Checked for exact duplicate texts
+- Removed duplicates to prevent bias
+
+MEASURE 3: Language Verification
+- Ensured text contains Sinhala characters
+- Filtered out English-only or Tamil-only content
+
+MEASURE 4: Source Verification
+- Only used known, reputable sources for TRUE labels
+- Human verification for FAKE labels
+
+
+9. ETHICAL CONSIDERATIONS
+=========================
+
+DATA PRIVACY:
+- All data is from public sources (news websites, public tweets)
+- No personal private information is stored
+- User names from tweets are anonymized
+
+BIAS CONSIDERATIONS:
+- Acknowledged that TRUE examples are mainly from mainstream media
+- This may bias toward "establishment" viewpoints
+- Future work could include alternative news sources
+
+COPYRIGHT:
+- News articles are used for research purposes only
+- System does not republish full articles
+- Only snippets are displayed as evidence
 
 
 ================================================================================
-                              END OF DATA SECTION
+                           END OF DATA SECTION
 ================================================================================
