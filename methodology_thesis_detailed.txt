@@ -1,0 +1,236 @@
+================================================================================
+        CHAPTER 4: METHODOLOGY - DEEP DIVE (THESIS VERSION)
+================================================================================
+                           Sinhala Agentic Fake News Detection
+                                   December 2024
+================================================================================
+
+4.1 PREAMBLE: THE PARADIGM SHIFT IN AUTOMATED FACT-CHECKING
+===========================================================
+
+This research departs from the traditional supervised learning paradigm prevalent
+in fake news detection literature (e.g., training LSTM or BERT classifiers on
+static datasets). Instead, it implements a **Two-Stage Agentic Pipeline**, a
+methodology grounded in the cognitive workflow of professional human fact-checkers.
+
+4.1.1 The Limitation of Monolithic Classifiers
+----------------------------------------------
+Traditional models ($f(x) \rightarrow y$) map a claim $x$ directly to a label $y$.
+This approach suffers from three critical methodological flaws:
+1.  **Static Knowledge Base**: The model's knowledge is frozen at the time of
+    training ($t_{train}$). It cannot verify claims about events occurring at
+    $t > t_{train}$.
+2.  **Opaque Reasoning**: The decision boundary is high-dimensional and non-linear,
+    making it difficult to explain *why* a specific classification was made.
+3.  **Hallucination**: When forced to classify unknown inputs, deep learning models
+    often exhibit overconfidence in incorrect predictions.
+
+4.1.2 The Agentic Solution
+--------------------------
+The proposed methodology decomposes the problem into two distinct cognitive tasks:
+1.  **Information Retrieval (Research)**: $Search(x) \rightarrow Evidence$
+2.  **Information Evaluation (Judgment)**: $Judge(Evidence) \rightarrow Verdict$
+
+This separation ensures that the verdict is derived solely from retrieved evidence,
+minimizing hallucination and enforcing citation-based transparency.
+
+
+4.2 SYSTEM ARCHITECTURE AND DATA FLOW
+=====================================
+
+The system implements an **Orchestrator-Worker** architectural pattern containing
+the following core components:
+
+1.  **Claim Decomposition Module (Preprocessing)**
+2.  **Vector Memory Store (Long-Term Memory)**
+3.  **Research Agent (The Investigator)**
+4.  **Judge Agent (The Adjudicator)**
+
+4.2.1 Data Flow Algorithm
+-------------------------
+Let $C$ be the user claim. The pipeline executes the following algorithm:
+
+1.  **Preprocessing**: $C' = Preprocess(C)$ where $C'$ contains normalized keywords,
+    entities, and temporal markers.
+2.  **Routing**:
+    $Type = TemporalClassify(C')$
+    If $Type == "Historical"$ AND $Similarity(C', Database) > \theta$:
+        Return $CachedVerdict$
+    Else:
+        Initiate Agentic Pipeline.
+3.  **Stage 1 (Research)**:
+    $E = \{e_1, e_2, ..., e_n\} \leftarrow ResearchAgent(C')$
+    Where $E$ is a set of $n$ evidence snippets sourced from web/database.
+4.  **Stage 2 (Judgment)**:
+    $V, Expl \leftarrow JudgeAgent(C', E)$
+    Where $V$ is the verdict label and $Expl$ is the natural language explanation.
+
+
+4.3 DETAILED COMPONENT METHODOLOGY
+==================================
+
+4.3.1 Preprocessing: The Claim Decomposer
+-----------------------------------------
+Raw user input is rarely suitable for direct database querying. The `ClaimDecomposer`
+class implements a rule-based NLP pipeline:
+
+**Step A: Keyword Extraction**
+We employ a custom stop-word list specific to news domains.
+$Keywords = Tokenize(C) - StopWords_{si} - StopWords_{en}$
+*   *Sinhala Stop Words*: {සහ, ගැන, විසින්, ...}
+*   *Implementation*: Python lexical comparison.
+
+**Step B: Named Entity Recognition (NER)**
+We utilize regex patterns to identify key entities:
+*   *Person*: Capitalized sequences in English context; Honorifics (මහතා, මැති) in Sinhala.
+*   *Temporal*: Years (2020-2025), relative markers (today, yesterday).
+
+**Step C: Temporal Classification Logic**
+The system must decide whether to use "Live Search" or "Archived Data".
+Algorithm:
+```python
+If any(keyword in RecentKeywords for keyword in C'):
+    Return "RECENT"  # Forces Web Search
+Else If MaxIdentifiedYear(C') >= CurrentYear:
+    Return "RECENT"
+Else:
+    Return "GENERAL" # Allows Database Retrieval
+```
+This heuristic ensures that breaking news (which hasn't been indexed yet) is
+always routed to the live web search.
+
+4.3.2 The Vector Store (Long-Term Memory)
+-----------------------------------------
+We utilize **Pinecone**, a vector database, to store 5,000+ verified articles.
+
+**Embedding Generation**:
+Text is converted to dense vectors using the **intfloat/multilingual-e5-large** model.
+$v_d = Encoder(d)$ where $v_d \in \mathbb{R}^{1024}$.
+*   *Why this model?* It is trained on parallel data covering 100+ languages,
+    allowing it to map Sinhala and English texts with similar meanings to close
+    points in vector space.
+
+**Similarity Metric**:
+We use **Cosine Similarity** to measure distance between claim vector $v_c$ and
+document vector $v_d$:
+$Score(v_c, v_d) = \frac{v_c \cdot v_d}{||v_c|| ||v_d||}$
+
+**Retrieval Strategy**:
+We employ a `top-k` retrieval with $k=5$.
+Why $k=5$? Experimental tuning showed that $k<3$ often missed context, while $k>7$
+introduced noise (irrelevant articles) that confused the Judge Agent.
+
+
+4.4 STAGE 1: THE RESEARCH AGENT DOCUMENTATION
+=============================================
+
+The Research Agent is not just an LLM; it is an LLM equipped with tools (Function Calling).
+
+**Objective**: To gather $E$ (Evidence) such that $E$ contains diverse perspectives.
+
+**Methodology of Evidence Collection**:
+1.  **Query Generation**: The agent generates 2 distinct search queries:
+    *   $Q_{si}$: Sinhala query optimized for local sources (Lankadeepa, Hiru).
+    *   $Q_{en}$: English query optimized for international coverage (Reuters, AFP).
+2.  **Source Filtering**:
+    The agent applies a whitelist heuristic:
+    *   *Tier 1 (High Credibility)*: Government domains (`.gov.lk`), Official domains.
+    *   *Tier 2 (News Media)*: Known reputable outlets.
+    *   *Tier 3 (Social/Unknown)*: Twitter, Facebook (flagged for low credibility).
+3.  **Extraction Constraint**:
+    Through System Prompt Engineering, we enforce that the agent extracts **verbatim snippets**.
+    *   *Constraint*: "Do not summarize unless necessary. Prefer direct quotes."
+    *   *Reasoning*: Summarization introduces bias. Raw text preserves the original nuance.
+
+**Output Structure**:
+The Research Agent does *not* output text. It outputs a JSON object:
+```json
+{
+  "evidence": [
+    { "text": "...", "source": "Lankadeepa", "sentiment": "SUPPORTS" },
+    { "text": "...", "source": "Twitter", "sentiment": "REFUTES" }
+  ]
+}
+```
+This structural constraint is enforced via the `pydantic` schema validation or precise prompt engineering.
+
+
+4.5 STAGE 2: THE JUDGE AGENT METHODOLOGY
+========================================
+
+The Judge Agent simulates the reasoning process of a human editor. It is strictly
+isolated from the outside web to prevent contamination.
+
+**Input**: It receives *only* the JSON output from Stage 1.
+
+**The "Chain of Verification" Prompt Strategy**:
+We designed a specific prompt structure to guide the agent's reasoning:
+
+1.  **Phase 1: Source Weighing**
+    "Sort the evidence by credibility. Ignore Tier 3 evidence if it contradicts Tier 1."
+2.  **Phase 2: Conflict Resolution**
+    "If Evidence A (Official) says X, and Evidence B (Social) says Y, assume X is true."
+3.  **Phase 3: Verdict Determination**
+    *   *TRUE*: >75% of reliable evidence supports the claim.
+    *   *FALSE*: Reliable evidence explicitly refutes the claim.
+    *   *MISLEADING*: Evidence supports the event happened, but details (date/location) are wrong.
+    *   *UNVERIFIED*: Evidence is sparse or relies solely on Tier 3 sources.
+
+**Citation Methodology**:
+To achieve transparency, the Judge Agent generates an explanation using a
+**Citation-in-Context** format.
+*   *Requirement*: Every factual assertion must be followed by a `[Source ID]`.
+*   *Validation*: While we currently rely on the LLM's capability to follow this
+    instruction, the explicit separation of Stage 1 (giving IDs) and Stage 2
+    (using IDs) significantly reduces hallucinated citations.
+
+
+4.6 HYBRID STRATEGY: OPTIMIZING LATENCY VS ACCURACY
+===================================================
+
+A fully agentic web search is slow (10-20 seconds). To make the system viable
+for real-time use, we implemented a **Hybrid Routing Strategy**.
+
+Let user claim be $C$.
+Let $VDB$ be the Vector Database.
+
+**Algorithm:**
+1.  Query $VDB$ with $C$ to get best match $M$ with similarity score $S$.
+2.  **Threshold Check**:
+    *   If $S \geq 0.92$: The claim is effectively identical to a known verified fact.
+        $\rightarrow$ **Fast Path**: Return stored verdict immediately. (Latency: <0.5s)
+    *   If $0.85 \leq S < 0.92$: The claim is similar but might have nuanced differences.
+        $\rightarrow$ **Augmented Path**: Retrieve $M$ as context, but *also* perform Web Search.
+    *   If $S < 0.85$: The claim is likely new or unknown.
+        $\rightarrow$ **Full Agentic Path**: Trigger full Research Agent. (Latency: ~15s)
+
+This Hybrid Strategy ensures that common viral rumors are debunked instantly,
+while novel misinformation receives the rigorous investigation it requires.
+
+
+4.7 ETHICAL CONSIDERATIONS IN METHODOLOGY
+=========================================
+
+4.7.1 Privacy Preservation via Data Minimization
+------------------------------------------------
+The methodology strictly adheres to "Data Minimization":
+*   We scrape only public news data.
+*   We do not store user identifiers (IP, cookies) associated with queries.
+*   Twitter identifiers are anonymized in accordance with API terms of service.
+
+4.7.2 Bias Mitigation in Sampling
+---------------------------------
+Automated systems often reflect the bias of their training data. To mitigate this:
+*   **Source Diversity**: The Research Agent is explicitly prompted to fetch
+    evidence from *at least* 3 different sources if available.
+*   **Multi-Perspective Requirement**: The prompt instruction "Find conflicting evidence"
+    forces the agent to look for counter-narratives, preventing confirmation bias bubbles.
+
+4.7.3 Transparency
+------------------
+The system is designed to be a "Decision Support System," not a "Truth Arbiter."
+The User Interface (UI) always displays:
+1.  The Verdict
+2.  The Reliability Score (0.0 - 1.0)
+3.  The Raw Sources (Links)
+This empowers the user to verify the AI's conclusion, rather than blindly trusting it.
