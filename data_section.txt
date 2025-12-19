@@ -1,0 +1,258 @@
+================================================================================
+                    DATA SECTION - HOW I HANDLED THE CSV FILES
+================================================================================
+                           Sinhala Fake News Detection Project
+                                   December 2024
+================================================================================
+
+
+INTRODUCTION
+============
+
+This document explains how I collected, processed, and used the data for my
+thesis project. I used CSV files from different sources. Each file had
+Sinhala text or news articles. I combined all of them into one dataset.
+
+
+THE CSV FILES I USED
+====================
+
+I used 5 different CSV files:
+
+FILE 1: Lankadeepa_2019.csv
+---------------------------
+- Source: Lankadeepa newspaper website
+- What it contains: News articles from 2019
+- Language: Sinhala
+- Label: ALL TRUE (because Lankadeepa is a trusted newspaper)
+- Columns: title, content
+
+FILE 2: NewsPosts_Legit.csv
+---------------------------
+- Source: Legitimate news posts from social media
+- What it contains: Verified news posts
+- Language: Sinhala
+- Label: ALL TRUE (manually verified as real news)
+- Columns: content
+
+FILE 3: FakeNews_Annotated.csv
+------------------------------
+- Source: Manually annotated dataset
+- What it contains: Mix of real and fake news
+- Language: Sinhala
+- Label: 0 = FALSE, 1 = TRUE
+- Columns: Text, Label
+
+FILE 4: hirunews_2023_02_to_2023_06_1000_cleaned_labeled.csv
+------------------------------------------------------------
+- Source: Hiru News website (scraped in 2023)
+- What it contains: 1000 news articles from February to June 2023
+- Language: Sinhala
+- Label: verified column (TRUE/FALSE)
+- Columns: title, content, verified
+
+FILE 5: TwitterPosts_Labeled.csv
+--------------------------------
+- Source: Twitter/X posts about Sri Lankan news
+- What it contains: Social media posts with claims
+- Language: Sinhala and mixed (Singlish)
+- Label: 0 = FALSE, 1 = TRUE
+- Columns: Text, Label
+
+
+HOW I MERGED THE FILES
+======================
+
+Step 1: Read Each File
+----------------------
+I used Python pandas library to read each CSV file.
+Each file had different column names, so I had to handle them separately.
+
+Step 2: Extract Text and Label
+------------------------------
+For each row in each file:
+- I found the text column (could be 'content', 'Text', 'cleaned_t')
+- I found the label column (could be 'Label', 'verified', or all TRUE)
+- I standardized labels to lowercase: "true" or "false"
+
+Step 3: Filter Short Text
+-------------------------
+I removed any text that was less than 30 characters.
+Short texts don't have enough information for fact-checking.
+
+Step 4: Add Metadata
+--------------------
+For each record, I added:
+- id: A unique number
+- source: Where the data came from (Lankadeepa, Twitter, etc.)
+- title: The headline (if available)
+
+Step 5: Save as JSONL
+---------------------
+I saved everything to one file: unified_labeled.jsonl
+JSONL means each line is a separate JSON object.
+
+Example output:
+{"id": "1", "text": "ජනාධිපති...", "source": "Lankadeepa", "label": "true"}
+{"id": "2", "text": "අද සිට...", "source": "Twitter", "label": "false"}
+
+
+HOW I PREPROCESSED THE TEXT
+===========================
+
+After merging, I applied NLP preprocessing:
+
+Step 1: Text Normalization
+--------------------------
+- Removed extra spaces
+- Removed special characters
+- Standardized Sinhala Unicode
+
+Step 2: Tokenization
+--------------------
+- Split text into words
+- Sinhala uses spaces differently, so I used special rules
+
+Step 3: POS Tagging
+-------------------
+- Identified nouns (NN) and verbs (VB)
+- Used sinling library for Sinhala POS tagging
+
+Step 4: Named Entity Recognition (NER)
+--------------------------------------
+- Found person names
+- Found place names
+- Found organization names
+
+Step 5: Claim Detection
+-----------------------
+- Checked for claim indicator words like:
+  - "අනුව" (according to)
+  - "කියා" (said that)
+  - "පවසයි" (says)
+
+Step 6: Save Enhanced Data
+--------------------------
+Output file: processed.jsonl
+
+Each document now has:
+{
+    "id": "123",
+    "text": "original text",
+    "sentences": ["sent1", "sent2"],
+    "label": "true",
+    "nlp": {
+        "token_count": 45,
+        "entities": {"PERSON": ["Mahinda"], "PLACE": ["Colombo"]},
+        "nouns": ["ජනාධිපති", "ප්‍රකාශය"],
+        "verbs": ["කළා", "පැවසුවා"],
+        "has_claim_indicator": true,
+        "has_negation": false
+    }
+}
+
+
+HOW I INDEXED TO PINECONE
+=========================
+
+The final step was storing the data in Pinecone vector database.
+
+Step 1: Generate Embeddings
+---------------------------
+- For each document, I created a vector (list of 768 numbers)
+- Used OpenRouter API with embedding model
+- The vector captures the "meaning" of the text
+
+Step 2: Upload to Pinecone
+--------------------------
+- Created two namespaces:
+  - "dataset": For labeled training data
+  - "live_news": For scraped news articles
+
+Step 3: Store Metadata
+----------------------
+Along with the vector, I stored:
+- Original text
+- Label (true/false)
+- Source
+- NLP features (entities, nouns)
+
+
+SUMMARY OF DATA PIPELINE
+========================
+
+CSV Files → Merge → Preprocess → Generate Embeddings → Store in Pinecone
+
++-----------------+     +-------------+     +------------+
+| Lankadeepa CSV  |     |             |     |            |
+| NewsPosts CSV   |---->|   MERGE     |---->| PREPROCESS |
+| FakeNews CSV    |     | (Python)    |     | (NLP)      |
+| Hirunews CSV    |     |             |     |            |
+| Twitter CSV     |     |             |     |            |
++-----------------+     +-------------+     +------------+
+                                                  |
+                                                  v
+                        +-------------+     +------------+
+                        |  PINECONE   |<----| EMBEDDINGS |
+                        |  DATABASE   |     | (OpenRouter)|
+                        +-------------+     +------------+
+
+
+TOTAL DATA STATISTICS
+=====================
+
+After processing all files:
+
+Total Documents: ~5,000 records
+True Labels: ~4,000 (80%)
+False Labels: ~1,000 (20%)
+
+Sources breakdown:
+- Lankadeepa: ~2,500 articles
+- Hiru News: ~1,000 articles
+- Twitter Posts: ~1,000 posts
+- Other: ~500 records
+
+Note: The data is imbalanced (more TRUE than FALSE).
+This is common in real-world fake news datasets because
+most news is actually true.
+
+
+SCRIPTS USED
+============
+
+1. merge_datasets.py
+   - Combines all CSV files
+   - Outputs: unified_labeled.jsonl
+
+2. preprocess.py
+   - Applies NLP analysis
+   - Outputs: processed.jsonl
+
+3. index_to_pinecone.py
+   - Generates embeddings
+   - Uploads to Pinecone database
+
+
+LESSONS LEARNED
+===============
+
+1. Different CSV files have different column names
+   Solution: Use row.get('column1', row.get('column2', ''))
+
+2. Some files have labels as numbers (0,1), others as strings (TRUE/FALSE)
+   Solution: Standardize everything to lowercase "true" or "false"
+
+3. Sinhala text needs special handling
+   Solution: Used sinling library for tokenization and POS tagging
+
+4. Some records are too short to be useful
+   Solution: Filter out anything less than 30 characters
+
+5. Embeddings are expensive to generate
+   Solution: Save processed.jsonl first, then generate embeddings once
+
+
+================================================================================
+                              END OF DATA SECTION
+================================================================================
