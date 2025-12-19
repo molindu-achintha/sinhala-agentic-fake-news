@@ -26,7 +26,6 @@ app = FastAPI(
 )
 
 # Add CORS middleware to allow frontend to call the API
-# In production, replace "*" with your actual frontend domain
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,7 +35,6 @@ app.add_middleware(
 )
 
 # Include API routers
-# Each router handles a group of related endpoints
 app.include_router(health.router, prefix="/v1", tags=["Health"])
 app.include_router(predict.router, prefix="/v1", tags=["Prediction"])
 app.include_router(news.router, prefix="/v1", tags=["News"])
